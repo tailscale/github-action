@@ -1,9 +1,9 @@
-# deploy action
+# Tailscale GitHub Action
 
-To use:
+Connects your GitHub Action to your Tailscale network.
 
-Set secret `TAILSCALE_AUTHKEY` to your authentication key.
+Usage:
 
-    uses: tailscale/deploy-action
-    with:
-        machine-name: 'hydrogen' # replace with hostname or IP address of machine to deploy to
+    uses: tailscale/tailscale-deploy-github@v1
+    env:
+	  TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }} # from your GitHub repository secrets
