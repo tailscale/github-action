@@ -1,0 +1,23 @@
+# Copyright (c) 2021 Tailscale Inc & AUTHORS All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+name: 'Connect Tailscale'
+description: 'Connect your GitHub Action workflow to Tailscale'
+runs:
+    using: 'composite'
+    steps:
+      - name: Install Tailscale
+        shell: bash
+        run: |
+          git clone https://github.com/tailscale/tailscale
+          cd tailscale
+          go mod vendor
+          go install -mod=readonly ./cmd/tailscaled ./cmd/tailscale
+          PATH=$PATH:$(go env GOPATH)/bin
+          cd ..
+      - name: Run Tailscale
+        shell: bash
+        run: |
+          sudo $(go env GOPATH)/bin/tailscaled 2>&1 >/dev/null &
+          sleep 3
+          sudo $(go env GOPATH)/bin/tailscale up --authkey $TAILSCALE_AUTHKEY --hostname "zz-github-$(cat /etc/hostname)"
