@@ -3,21 +3,39 @@
 # license that can be found in the LICENSE file.
 name: 'Connect Tailscale'
 description: 'Connect your GitHub Action workflow to Tailscale'
+inputs:
+  authkey:
+    description: 'Your Tailscale authentication key, from the admin panel.'
+    required: true
+  version:
+    description: 'Tailscale version to use.'
+    required: true
+    default: '1.6.0'
 runs:
     using: 'composite'
     steps:
-      - name: Install Tailscale
+      - name: Download Tailscale
         shell: bash
+        id: download
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          git clone https://github.com/tailscale/tailscale
-          cd tailscale
-          go mod vendor
-          go install -mod=readonly ./cmd/tailscaled ./cmd/tailscale
-          PATH=$PATH:$(go env GOPATH)/bin
-          cd ..
+          MINOR=$(echo $VERSION | awk -F '.' {'print $2'})
+          if [ $((MINOR % 2)) -eq 0 ]; then
+            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
+          else
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
+          fi
+          curl $URL -o tailscale.tgz
+          tar -C ~ -xzf tailscale.tgz
+          rm tailscale.tgz
+          mv "$HOME/tailscale_${VERSION}_amd64" ~/.tailscale
+          echo "PATH=$PATH:$HOME/.tailscale" >> $GITHUB_ENV
       - name: Run Tailscale
         shell: bash
+        env:
+          TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
         run: |
-          sudo $(go env GOPATH)/bin/tailscaled 2>&1 >/dev/null &
+          sudo $(which tailscaled) 2>~/.tailscale/tailscaled.log &
           sleep 3
-          sudo $(go env GOPATH)/bin/tailscale up --authkey $TAILSCALE_AUTHKEY --hostname "zz-github-$(cat /etc/hostname)"
+          sudo $(which tailscale) up --authkey $TAILSCALE_AUTHKEY --hostname "github-$(cat /etc/hostname)"
