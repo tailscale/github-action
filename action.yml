@@ -10,7 +10,7 @@ inputs:
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.6.0'
+    default: '1.12.3'
 runs:
     using: 'composite'
     steps:
@@ -27,15 +27,18 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
           fi
           curl $URL -o tailscale.tgz
-          tar -C ~ -xzf tailscale.tgz
+          tar -C ${HOME} -xzf tailscale.tgz
           rm tailscale.tgz
-          mv "$HOME/tailscale_${VERSION}_amd64" ~/.tailscale
-          echo "PATH=$PATH:$HOME/.tailscale" >> $GITHUB_ENV
+          TSPATH=${HOME}/tailscale_${VERSION}_amd64
+          sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Run Tailscale
         shell: bash
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
         run: |
-          sudo $(which tailscaled) 2>~/.tailscale/tailscaled.log &
-          sleep 3
-          sudo $(which tailscale) up --authkey $TAILSCALE_AUTHKEY --hostname "github-$(cat /etc/hostname)"
+          sudo tailscaled 2>~/tailscaled.log &
+          HOSTNAME="github-$(cat /etc/hostname)"
+          until sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME}
+          do
+            sleep 0.25
+          done
