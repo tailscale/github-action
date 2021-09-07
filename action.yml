@@ -3,6 +3,9 @@
 # license that can be found in the LICENSE file.
 name: 'Connect Tailscale'
 description: 'Connect your GitHub Action workflow to Tailscale'
+branding:
+  icon: 'arrow-right-circle'
+  color: 'gray-dark'
 inputs:
   authkey:
     description: 'Your Tailscale authentication key, from the admin panel.'
