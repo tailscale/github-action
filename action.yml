@@ -23,16 +23,16 @@ runs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          MINOR=$(echo $VERSION | awk -F '.' {'print $2'})
+          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
             URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
           else
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
           fi
-          curl $URL -o tailscale.tgz
-          tar -C ${HOME} -xzf tailscale.tgz
+          curl "$URL" -o tailscale.tgz
+          tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=${HOME}/tailscale_${VERSION}_amd64
+          TSPATH=/tmp/tailscale_${VERSION}_amd64
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Run Tailscale
         shell: bash
