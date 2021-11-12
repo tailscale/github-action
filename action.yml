@@ -13,7 +13,11 @@ inputs:
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.14.0'
+    default: '1.16.2'
+  args:
+    description: 'Optional additional arguments to `tailscale up`'
+    required: false
+    default: ''
 runs:
     using: 'composite'
     steps:
@@ -41,7 +45,7 @@ runs:
         run: |
           sudo tailscaled 2>~/tailscaled.log &
           HOSTNAME="github-$(cat /etc/hostname)"
-          until sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes
+          until sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${INPUTS_ARGS}
           do
             sleep 0.5
           done
