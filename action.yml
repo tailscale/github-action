@@ -42,7 +42,8 @@ runs:
         shell: bash
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
+          ADDITIONAL_ARGS: ${{ inputs.args }}
         run: |
           sudo tailscaled 2>~/tailscaled.log &
           HOSTNAME="github-$(cat /etc/hostname)"
-          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${INPUT_ARGS}
+          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
