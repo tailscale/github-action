@@ -14,6 +14,10 @@ inputs:
     description: 'Tailscale version to use.'
     required: true
     default: '1.18.0'
+  args:
+    description: 'Optional additional arguments to `tailscale up`'
+    required: false
+    default: ''
 runs:
     using: 'composite'
     steps:
@@ -38,7 +42,8 @@ runs:
         shell: bash
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
+          ADDITIONAL_ARGS: ${{ inputs.args }}
         run: |
           sudo tailscaled 2>~/tailscaled.log &
           HOSTNAME="github-$(cat /etc/hostname)"
-          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes
+          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
