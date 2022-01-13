@@ -6,8 +6,8 @@ by adding a step to your workflow.
 ```yaml
   - name: Tailscale
     uses: tailscale/github-action@v1
-      with:
-        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+    with:
+      authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 ```
 
 Subsequent steps in the Action can then access nodes in your Tailnet.
