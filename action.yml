@@ -21,6 +21,18 @@ inputs:
 runs:
     using: 'composite'
     steps:
+      - name: Check Runner OS
+        if: ${{ runner.os != 'Linux' }}
+        shell: bash
+        run: |
+          echo "::error title=⛔ error hint::Support Linux Only"
+          exit 1
+      - name: Check Auth Key Empty
+        if: ${{ inputs.authkey == '' }}
+        shell: bash
+        run: |
+          echo "::error title=⛔ error hint::Auth key empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
+          exit 1
       - name: Download Tailscale
         shell: bash
         id: download
