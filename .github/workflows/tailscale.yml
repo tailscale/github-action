@@ -18,15 +18,8 @@ jobs:
       - name: Tailscale Action
         uses: ./
         with:
-          apikey: ${{ secrets.TAILSCALE_APIKEY }}
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: check for hello.ts.net in netmap
+      - name: check for hello.ipn.dev in netmap
         run:
           tailscale status | grep -q hello
-          
-      - name: Stop Tailscale
-        if: always()
-        uses: ./
-        with:
-          apikey: ${{ secrets.TAILSCALE_APIKEY }}
-          action: down

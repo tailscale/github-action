@@ -7,18 +7,13 @@ branding:
   icon: 'arrow-right-circle'
   color: 'gray-dark'
 inputs:
-  action:
-    description: 'set to "down" to remove machine from tailnet'
-  apikey:
-    description: 'Your Tailscale API key, from the admin panel'
-  tailnet:
-    description: 'The name of your Tailscale network' 
   authkey:
     description: 'Your Tailscale authentication key, from the admin panel.'
+    required: true
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.22.1'
+    default: '1.18.2'
   args:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
@@ -27,7 +22,6 @@ runs:
     using: 'composite'
     steps:
       - name: Download Tailscale
-        if: inputs.action != 'down'
         shell: bash
         id: download
         env:
@@ -45,33 +39,11 @@ runs:
           TSPATH=/tmp/tailscale_${VERSION}_amd64
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Run Tailscale
-        if: inputs.action != 'down'
         shell: bash
         env:
-          TAILSCALE_APIKEY: ${{ inputs.apikey }}
-          TAILSCALE_TAILNET: ${{ inputs.tailnet }}
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
         run: |
-          sudo hostnamectl set-hostname github-$(cut -d "/" -f2- <<< "$GITHUB_REPOSITORY")-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT
-          : "${TAILSCALE_TAILNET:=$GITHUB_ACTOR.github}"
-          : ${TAILSCALE_AUTHKEY:=$( \
-            echo '{"capabilities":{"devices":{"create":{"reusable":false,"ephemeral":true}}}}' | curl \
-              -X POST --data-binary @- https://api.tailscale.com/api/v2/tailnet/$TAILSCALE_TAILNET/keys \
-              -u "$TAILSCALE_APIKEY:" \
-              -H "Content-Type: application/json" | jq -r ".key" \
-          )}
           sudo tailscaled 2>~/tailscaled.log &
-          HOSTNAME="$(cat /etc/hostname)"
+          HOSTNAME="github-$(cat /etc/hostname)"
           sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
-      - name: Stop Tailscale
-        if: inputs.action == 'down'
-        shell: bash
-        env:
-          TAILSCALE_APIKEY: ${{ inputs.apikey }}
-          TAILSCALE_TAILNET: ${{ inputs.tailnet }}
-        run: |
-          : "${TAILSCALE_TAILNET:=$GITHUB_ACTOR.github}"
-          ID=$(curl "https://api.tailscale.com/api/v2/tailnet/$TAILSCALE_TAILNET/devices" -u "$TAILSCALE_APIKEY:" | jq -r '.devices[] | select (.hostname=='\"$HOSTNAME\"') .id')
-          curl -X DELETE "https://api.tailscale.com/api/v2/device/$ID" \
-            -u "$TAILSCALE_APIKEY:" -v
