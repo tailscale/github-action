@@ -18,6 +18,10 @@ inputs:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
     default: ''
+  hostname:
+    description: 'Fixed hostname to use.'
+    required: false
+    default: ''
 runs:
     using: 'composite'
     steps:
@@ -43,7 +47,10 @@ runs:
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
+          HOSTNAME: ${{ inputs.hostname }}
         run: |
           sudo tailscaled 2>~/tailscaled.log &
-          HOSTNAME="github-$(cat /etc/hostname)"
+          if [ -z "${HOSTNAME}" ]; then
+            HOSTNAME="github-$(cat /etc/hostname)"
+          fi
           sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
