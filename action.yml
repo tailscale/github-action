@@ -50,7 +50,7 @@ runs:
           HOSTNAME: ${{ inputs.hostname }}
         run: |
           sudo tailscaled 2>~/tailscaled.log &
-          if [[ -z "${HOSTNAME}" ]]; then
+          if [ -z "${HOSTNAME}" ]; then
             HOSTNAME="github-$(cat /etc/hostname)"
           fi
           sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
