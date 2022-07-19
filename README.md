@@ -24,3 +24,5 @@ after the runner finishes.
 This repository is provided and maintained by Tailscale. The CI script in this
 repository uses an ephemeral authkey generated for the Tailnet owned by
 TailscaleGitHubActionBot.github and stored as a Secret as described above.
+
+Trigger the Action to run.
