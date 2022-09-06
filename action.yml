@@ -1,56 +1,147 @@
 # Copyright (c) 2021 Tailscale Inc & AUTHORS All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
-name: 'Connect Tailscale'
-description: 'Connect your GitHub Action workflow to Tailscale'
+name: "Connect Tailscale"
+description: "Connect your GitHub Action workflow to Tailscale"
 branding:
-  icon: 'arrow-right-circle'
-  color: 'gray-dark'
+  icon: "arrow-right-circle"
+  color: "gray-dark"
 inputs:
   authkey:
-    description: 'Your Tailscale authentication key, from the admin panel.'
+    description: "Your Tailscale authentication key, from the admin panel."
     required: true
-  version:
-    description: 'Tailscale version to use.'
-    required: true
-    default: '1.24.2'
   args:
-    description: 'Optional additional arguments to `tailscale up`'
+    description: "Optional additional arguments to `tailscale up`"
     required: false
+    deprecationMessage: "Please use specific input, this is no longer used in the script"
     default: ''
+  version:
+    description: "Tailscale version to use."
+    required: true
+    default: "1.30.0"
   hostname:
-    description: 'Fixed hostname to use.'
+    description: "Provide a hostname to use for the device instead of the one provided by the OS. Note that this will change the machine name used in MagicDNS."
     required: false
-    default: ''
+    default: ""
+  acceptDNS:
+    description: "Accept DNS configuration from the admin console. Defaults to accepting DNS settings."
+    required: false
+  acceptRoutes:
+    description: "Accept subnet routes that other nodes advertise. Linux devices default to not accepting routes."
+    required: false
+  advertiseExitNode:
+    description: "Offer to be an exit node for outbound internet traffic from the Tailscale network. Defaults to not offering to be an exit node."
+    required: false
+  advertiseRoutes:
+    description: "Expose physical subnet routes to your entire Tailscale network."
+    required: false
+  advertiseTags:
+    description: 'Give tagged permissions to this device. You must be listed in "TagOwners" to be able to apply tags.'
+    required: false
+  exitNodeAllowLanAccess:
+    description: "Allow direct access to the local network when routing traffic via an exit node. Defaults to not allowing direct access to your LAN."
+    required: false
+  exitNode:
+    description: "Provide a Tailscale IP to use as an exit node. To disable the use of an exit node, pass the flag with an empty argument: --exit-node="
+    required: false
+  forceReauth:
+    description: "Force re-authentication."
+    required: false
+  hostRoutes:
+    description: "Install all host routes in the tailnet on the local network, in addition to advertised routes. Defaults to including host routes."
+    required: false
+  netfilterMode:
+    description: "(Linux only) Advanced feature for controlling the degree of automatic firewall configuration. Values are either “off”, “nodivert”, or “on”. Defaults to “on”, except for Synology which defaults to “off”. "
+    required: false
+  qr:
+    description: "Generate a QR code for the web login URL. Defaults to not showing a QR code."
+    required: false
+  shieldsUp:
+    description: "lock incoming connections from other devices on your Tailscale network. Useful for personal devices that only make outgoing connections."
+    required: false
+  tailscaled_socket:
+    description: "path of the service unix socket"
+    required: false
+  tailscaled_state:
+    description: "absolute path of state file; use 'kube:<secret-name>' to use Kubernetes secrets or 'arn:aws:ssm:...' to store in AWS SSM; use 'mem:' to not store state and register as an emphemeral node. If empty and --statedir is provided, the default is <statedir>/tailscaled.state."
+    required: false
+  tailscaled_tun:
+    description: 'tunnel interface name; use "userspace-networking" (beta) to not use TUN'
+    required: false
+  tailscaled_verbose:
+    description: "log verbosity level; 0 is default, 1 or higher are increasingly verbose"
+    required: false
+
 runs:
-    using: 'composite'
-    steps:
-      - name: Download Tailscale
-        shell: bash
-        id: download
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
-          if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
-          else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
-          fi
-          curl "$URL" -o tailscale.tgz
-          tar -C /tmp -xzf tailscale.tgz
-          rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_amd64
-          sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
-      - name: Run Tailscale
-        shell: bash
-        env:
-          TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
-          ADDITIONAL_ARGS: ${{ inputs.args }}
-          HOSTNAME: ${{ inputs.hostname }}
-        run: |
-          sudo tailscaled 2>~/tailscaled.log &
-          if [ -z "${HOSTNAME}" ]; then
-            HOSTNAME="github-$(cat /etc/hostname)"
-          fi
-          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+  using: "composite"
+  steps:
+    - name: Download Tailscale
+      shell: bash
+      id: download
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
+        if [ $((MINOR % 2)) -eq 0 ]; then
+          URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
+        else
+          URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
+        fi
+        curl "$URL" -o tailscale.tgz
+        tar -C /tmp -xzf tailscale.tgz
+        rm tailscale.tgz
+        TSPATH=/tmp/tailscale_${VERSION}_amd64
+        sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+    - name: Run Tailscale
+      shell: bash
+      env:
+        TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
+        TAILSCALE_HOSTNAME: ${{ inputs.hostname }}
+        TAILSCALE_ACCEPT_DNS: ${{ inputs.acceptDNS }}
+        TAILSCALE_ACCEPT_ROUTES: ${{ inputs.acceptRoutes }}
+        TAILSCALE_ADVERTISE_EXIT_NODE: ${{ inputs.advertiseExitNode }}
+        TAILSCALE_ADVERTISE_ROUTES: ${{ inputs.advertiseRoutes }}
+        TAILSCALE_ADVERTISE_TAGS: ${{ inputs.advertiseTags }}
+        TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS: ${{ inputs.exitNodeAllowLanAccess }}
+        TAILSCALE_EXIT_NODE: ${{ inputs.exitNode }}
+        TAILSCALE_FORCE_REAUTH: ${{ inputs.forceReauth }}
+        TAILSCALE_HOST_ROUTES: ${{ inputs.hostRoutes }}
+        TAILSCALE_NETFILTER_MODE: ${{ inputs.netfilterMode }}
+        TAILSCALE_QR: ${{ inputs.qr }}
+        TAILSCALE_SHIELDS_UP: ${{ inputs.shieldsUp }}
+        TAILSCALED_SOCKET: ${{ inputs.tailscaled_socket }}
+        TAILSCALED_STATE: ${{ inputs.tailscaled_state }}
+        TAILSCALED_TUN: ${{ inputs.tailscaled_tun }}
+        TAILSCALED_VERBOSE: ${{ inputs.tailscaled_verbose }}
+      run: |
+        up() {
+          sleep 5
+
+          tailscale up \
+            --accept-dns=${TAILSCALE_ACCEPT_DNS:-true} \
+            --accept-routes=${TAILSCALE_ACCEPT_ROUTES:-false} \
+            --advertise-exit-node=${TAILSCALE_ADVERTISE_EXIT_NODE:-false} \
+            --advertise-routes=${TAILSCALE_ADVERTISE_ROUTES} \
+            --advertise-tags=${TAILSCALE_ADVERTISE_TAGS} \
+            --authkey=${TAILSCALE_AUTHKEY} \
+            --exit-node-allow-lan-access=${TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS:-false} \
+            --exit-node=${TAILSCALE_EXIT_NODE} \
+            --force-reauth=${TAILSCALE_FORCE_REAUTH:-false} \
+            --host-routes=${TAILSCALE_HOST_ROUTES:-true} \
+            --hostname=${TAILSCALE_HOSTNAME:-"github-$(cat /etc/hostname)"} \
+            --login-server=${TAILSCALE_LOGIN_SERVER:-"https://login.tailscale.com"} \
+            --netfilter-mode=${TAILSCALE_NETFILTER_MODE:-on} \
+            --qr=${TAILSCALE_QR:-false} \
+            --shields-up=${TAILSCALE_SHIELDS_UP:-false} \
+            --snat-subnet-routes=${TAILSCALE_SNAT_SUBNET_ROUTES:-true}
+        }
+
+        if [ ! -d /dev/net ]; then mkdir /dev/net; fi
+        if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi
+
+        up & tailscaled \
+          -port ${TAILSCALED_PORT:-0} \
+          -socket ${TAILSCALED_SOCKET:-"/var/run/tailscale/tailscaled.sock"} \
+          -state ${TAILSCALED_STATE:-"/var/lib/tailscale/tailscaled.state"} \
+          -tun ${TAILSCALED_TUN:-"tailscale0"} \
+          -verbose ${TAILSCALED_VERBOSE:-0} 2>~/tailscaled.log &
