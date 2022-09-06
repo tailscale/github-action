@@ -121,7 +121,7 @@ runs:
         up() {
           sleep 5
 
-          tailscale up \
+          sudo tailscale up \
             --accept-dns=${TAILSCALE_ACCEPT_DNS:-true} \
             --accept-routes=${TAILSCALE_ACCEPT_ROUTES:-false} \
             --advertise-exit-node=${TAILSCALE_ADVERTISE_EXIT_NODE:-false} \
@@ -143,7 +143,7 @@ runs:
         if [ ! -d /dev/net ]; then mkdir /dev/net; fi
         if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi
 
-        up & tailscaled \
+        up & sudo tailscaled \
           -port ${TAILSCALED_PORT:-0} \
           -socket ${TAILSCALED_SOCKET:-"/var/run/tailscale/tailscaled.sock"} \
           -state ${TAILSCALED_STATE:-"/var/lib/tailscale/tailscaled.state"} \
