@@ -114,6 +114,10 @@ runs:
         TAILSCALED_TUN: ${{ inputs.tailscaled_tun }}
         TAILSCALED_VERBOSE: ${{ inputs.tailscaled_verbose }}
       run: |
+        if [ -z "${TAILSCALE_HOSTNAME}" ]; then
+          TAILSCALE_HOSTNAME="github-$(cat /etc/hostname)"
+        fi
+
         up() {
           sleep 5
 
@@ -128,7 +132,7 @@ runs:
             --exit-node=${TAILSCALE_EXIT_NODE} \
             --force-reauth=${TAILSCALE_FORCE_REAUTH:-false} \
             --host-routes=${TAILSCALE_HOST_ROUTES:-true} \
-            --hostname=${TAILSCALE_HOSTNAME:-"github-$(cat /etc/hostname)"} \
+            --hostname=${TAILSCALE_HOSTNAME:-$(cat /etc/hostname)} \
             --login-server=${TAILSCALE_LOGIN_SERVER:-"https://login.tailscale.com"} \
             --netfilter-mode=${TAILSCALE_NETFILTER_MODE:-on} \
             --qr=${TAILSCALE_QR:-false} \
