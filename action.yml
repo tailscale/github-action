@@ -140,6 +140,9 @@ runs:
             --snat-subnet-routes=${TAILSCALE_SNAT_SUBNET_ROUTES:-true}
         }
 
+        if [ ! -d /dev/net ]; then mkdir /dev/net; fi
+        if [ ! -e /dev/net/tun ]; then mknod /dev/net/tun c 10 200; fi
+
         up & sudo tailscaled \
           -port ${TAILSCALED_PORT:-0} \
           -socket ${TAILSCALED_SOCKET:-"/var/run/tailscale/tailscaled.sock"} \
