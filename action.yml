@@ -13,7 +13,7 @@ inputs:
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.32.1'
+    default: '1.42.0'
   args:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
