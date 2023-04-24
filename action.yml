@@ -14,6 +14,10 @@ inputs:
     description: 'Tailscale version to use.'
     required: true
     default: '1.32.1'
+  sha256sum:
+    description: 'Expected SHA256 checksum of the tarball.'
+    required: false
+    default: ''
   args:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
@@ -42,6 +46,7 @@ runs:
         id: download
         env:
           VERSION: ${{ inputs.version }}
+          SHA256SUM: ${{ inputs.sha256sum }}
         run: |
           MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
@@ -50,6 +55,9 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
           fi
           curl "$URL" -o tailscale.tgz
+          if [[ "$SHA256SUM" ]] ; then
+            echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
+          fi
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_amd64
