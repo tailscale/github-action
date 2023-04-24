@@ -18,6 +18,10 @@ inputs:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
     default: ''
+  daemon_args:
+    description: 'Optional additional arguments to `tailscaled`'
+    required: false
+    default: ''
   hostname:
     description: 'Fixed hostname to use.'
     required: false
@@ -59,9 +63,10 @@ runs:
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
+          ADDITIONAL_DAEMON_ARGS: ${{ inputs.daemon_args }}
           HOSTNAME: ${{ inputs.hostname }}
         run: |
-          sudo tailscaled 2>~/tailscaled.log &
+          sudo tailscaled ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
           if [ -z "${HOSTNAME}" ]; then
             HOSTNAME="github-$(cat /etc/hostname)"
           fi
