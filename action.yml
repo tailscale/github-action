@@ -57,11 +57,11 @@ runs:
       - name: Start Tailscale Daemon
         shell: bash
         run: |
-          sudo tailscaled 2>~/tailscaled.log &
+          sudo -E tailscaled 2>~/tailscaled.log &
           # And check that tailscaled came up. The CLI will block for a bit waiting
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
-          sudo tailscale status --json >/dev/null
+          sudo -E tailscale status --json >/dev/null
       - name: Connect to Tailscale
         shell: bash
         env:
@@ -72,4 +72,4 @@ runs:
           if [ -z "${HOSTNAME}" ]; then
             HOSTNAME="github-$(cat /etc/hostname)"
           fi
-          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          sudo -E tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
