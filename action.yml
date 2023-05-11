@@ -7,14 +7,18 @@ branding:
   icon: 'arrow-right-circle'
   color: 'gray-dark'
 inputs:
+  authkey:
+    description: 'Your Tailscale authentication key, from the admin panel. Optional if you use OAuth'
+    required: false
   client_id:
-    description: 'Your Tailscale OAuth App client id'
-    required: true
+    description: 'Your Tailscale OAuth App client id. Required for OAuth'
+    required: false
   client_secret:
-    description: 'Your Tailscale OAuth App client secret'
-    required: true
+    description: 'Your Tailscale OAuth App client secret. Required for OAuth'
+    required: false
   device_tag:
-    description: 'Tag to tag the device with (ex. tag:example)'
+    description: 'Tag to tag the device with (ex. tag:example). Required for OAuth'
+    required: false
   version:
     description: 'Tailscale version to use.'
     required: true
@@ -37,10 +41,10 @@ runs:
           echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
       - name: Check Auth Key Empty
-        if: ${{ inputs.client_id == '' || inputs.client_secret == '' }}
+        if: ${{ inputs.authkey == '' && (inputs.client_id == '' || inputs.client_secret == '' || inputs.device_tag == '') }}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::client_id or client_secret empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
+          echo "::error title=⛔ error hint::authkey, client_id, client_secret or device_tag empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
           exit 1
       - name: Download Tailscale
         shell: bash
@@ -60,6 +64,7 @@ runs:
           TSPATH=/tmp/tailscale_${VERSION}_amd64
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Generate ephemeral authkey
+        if: ${{ inputs.authkey == '' }}
         id: authenticate
         shell: bash
         env:
@@ -116,7 +121,7 @@ runs:
       - name: Connect to Tailscale
         shell: bash
         env:
-          TAILSCALE_AUTHKEY: ${{ steps.authenticate.outputs.authkey }}
+          TAILSCALE_AUTHKEY: ${{ inputs.authkey || steps.authenticate.outputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
           HOSTNAME: ${{ inputs.hostname }}
         run: |

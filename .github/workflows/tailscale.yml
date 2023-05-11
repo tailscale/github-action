@@ -18,9 +18,11 @@ jobs:
       - name: Tailscale Action
         uses: ./
         with:
-          client_id: ${{ secrets.OAUTH_CLIENT_ID }}
-          client_secret: ${{ secrets.OAUTH_CLIENT_SECRET }}
-          device_tag: ${{ secrets.DEVICE_TAG }}
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          ## uncomment below to use OAuth Auth
+          # client_id: ${{ secrets.OAUTH_CLIENT_ID }}
+          # client_secret: ${{ secrets.OAUTH_CLIENT_SECRET }}
+          # device_tag: ${{ secrets.DEVICE_TAG }}
 
       - name: check for hello.ipn.dev in netmap
         run:
