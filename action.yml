@@ -7,9 +7,14 @@ branding:
   icon: 'arrow-right-circle'
   color: 'gray-dark'
 inputs:
-  authkey:
-    description: 'Your Tailscale authentication key, from the admin panel.'
+  client_id:
+    description: 'Your Tailscale OAuth App client id'
     required: true
+  client_secret:
+    description: 'Your Tailscale OAuth App client secret'
+    required: true
+  device_tag:
+    description: 'Tag to tag the device with (ex. tag:example)'
   version:
     description: 'Tailscale version to use.'
     required: true
@@ -32,10 +37,10 @@ runs:
           echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
       - name: Check Auth Key Empty
-        if: ${{ inputs.authkey == '' }}
+        if: ${{ inputs.client_id == '' || inputs.client_secret == '' }}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::Auth key empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
+          echo "::error title=⛔ error hint::client_id or client_secret empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets"
           exit 1
       - name: Download Tailscale
         shell: bash
@@ -54,6 +59,52 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_amd64
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+      - name: Generate ephemeral authkey
+        id: authenticate
+        shell: bash
+        env:
+          OAUTH_CLIENT_ID: ${{ inputs.client_id }}
+          OAUTH_CLIENT_SECRET: ${{ inputs.client_secret }}
+          DEVICE_TAG: ${{ inputs.device_tag }}
+        run: |
+           token=$(curl -s \
+               -d "client_id=${OAUTH_CLIENT_ID}" \
+               -d "client_secret=${OAUTH_CLIENT_SECRET}" \
+               "https://api.tailscale.com/api/v2/oauth/token" | jq -r .access_token)
+
+           if [ "x$token" == "x" ]; then
+              echo "::error title=⛔ error hint::Failed to acuqire access token"
+              exit 1
+           fi
+
+           request=$(cat << EOF
+           {
+            "capabilities": {
+              "devices": {
+                "create": {
+                  "reusable": false,
+                  "ephemeral": true,
+                  "preauthorized": true,
+                  "tags": [ "$DEVICE_TAG" ]
+               }
+              }
+            },
+            "expirySeconds": 600
+           }
+           EOF
+           )
+
+           authkey=$(echo "$request" | curl -s "https://api.tailscale.com/api/v2/tailnet/-/keys" \
+               -u "$token:" \
+               --data-binary @- | jq -r .key)
+
+           if [ "x$authkey" == "x" ]; then
+              echo "::error title=⛔ error hint::Failed to acuqire device authkey"
+              exit 1
+           fi
+
+           echo authkey="$authkey" >> $GITHUB_OUTPUT
+
       - name: Start Tailscale Daemon
         shell: bash
         run: |
@@ -65,7 +116,7 @@ runs:
       - name: Connect to Tailscale
         shell: bash
         env:
-          TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
+          TAILSCALE_AUTHKEY: ${{ steps.authenticate.outputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
           HOSTNAME: ${{ inputs.hostname }}
         run: |

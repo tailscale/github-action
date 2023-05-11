@@ -18,8 +18,10 @@ jobs:
       - name: Tailscale Action
         uses: ./
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          client_id: ${{ secrets.OAUTH_CLIENT_ID }}
+          client_secret: ${{ secrets.OAUTH_CLIENT_SECRET }}
+          device_tag: ${{ secrets.DEVICE_TAG }}
 
       - name: check for hello.ipn.dev in netmap
         run:
-          tailscale status | grep -q hello
+          tailscale status | grep -q ^100
