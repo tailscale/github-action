@@ -22,6 +22,10 @@ inputs:
     description: 'Fixed hostname to use.'
     required: false
     default: ''
+  arch:
+    description: 'Arch to use for Tailscale binary, default is amd64.'
+    required: false
+    default: 'amd64'
 runs:
     using: 'composite'
     steps:
@@ -42,17 +46,18 @@ runs:
         id: download
         env:
           VERSION: ${{ inputs.version }}
+          ARCH: ${{ inputs.arch }}
         run: |
           MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
+            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${ARCH}.tgz"
           else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${ARCH}.tgz"
           fi
           curl "$URL" -o tailscale.tgz
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_amd64
+          TSPATH=/tmp/tailscale_${VERSION}_${ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Start Tailscale Daemon
         shell: bash
