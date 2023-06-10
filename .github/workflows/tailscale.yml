@@ -18,8 +18,10 @@ jobs:
       - name: Tailscale Action
         uses: ./
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
-      - name: check for hello.ipn.dev in netmap
+      - name: check for hello.ts.net in netmap
         run:
           tailscale status | grep -q hello
