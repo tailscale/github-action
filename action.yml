@@ -18,6 +18,10 @@ inputs:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
     default: ''
+  daemon_args:
+    description: 'Optional additional arguments to `tailscaled`'
+    required: false
+    default: ''
   hostname:
     description: 'Fixed hostname to use.'
     required: false
@@ -54,22 +58,16 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_amd64
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
-      - name: Start Tailscale Daemon
-        shell: bash
-        run: |
-          sudo -E tailscaled 2>~/tailscaled.log &
-          # And check that tailscaled came up. The CLI will block for a bit waiting
-          # for it. And --json will make it exit with status 0 even if we're logged
-          # out (as we will be). Without --json it returns an error if we're not up.
-          sudo -E tailscale status --json >/dev/null
-      - name: Connect to Tailscale
+      - name: Run Tailscale
         shell: bash
         env:
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
+          ADDITIONAL_DAEMON_ARGS: ${{ inputs.daemon_args }}
           HOSTNAME: ${{ inputs.hostname }}
         run: |
+          sudo tailscaled ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
           if [ -z "${HOSTNAME}" ]; then
             HOSTNAME="github-$(cat /etc/hostname)"
           fi
-          sudo -E tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          sudo tailscale up --authkey ${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
