@@ -54,10 +54,11 @@ runs:
           else
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
           fi
-          curl "$URL" -o tailscale.tgz
-          if [[ "$SHA256SUM" ]] ; then
-            echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
+          if ! [[ "$SHA256SUM" ]] ; then
+            SHA256SUM="$(curl "${URL}.sha256")"
           fi
+          curl "$URL" -o tailscale.tgz
+          echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_amd64
