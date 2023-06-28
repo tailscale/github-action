@@ -18,6 +18,10 @@ inputs:
     description: 'Optional additional arguments to `tailscale up`'
     required: false
     default: ''
+  tailscaled-args:
+    description: 'Optional additional arguments to `tailscaled`'
+    required: false
+    default: ''
   hostname:
     description: 'Fixed hostname to use.'
     required: false
@@ -56,8 +60,10 @@ runs:
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Start Tailscale Daemon
         shell: bash
+        env:
+          ADDITIONAL_DAEMON_ARGS: ${{ inputs.tailscaled-args }}
         run: |
-          sudo -E tailscaled 2>~/tailscaled.log &
+          sudo -E tailscaled ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
           # And check that tailscaled came up. The CLI will block for a bit waiting
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
