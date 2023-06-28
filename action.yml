@@ -57,16 +57,27 @@ runs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          if [ ${{ runner.arch }} = "ARM64" ]; then
+            TS_ARCH="arm64"
+          elif [ ${{ runner.arch }} = "ARM" ]; then
+            TS_ARCH="arm"
+          elif [ ${{ runner.arch }} = "X86" ]; then
+            TS_ARCH="386"
+          elif [ ${{ runner.arch }} = "X64" ]; then
+            TS_ARCH="amd64"
+          else
+            TS_ARCH="amd64"
+          fi
           MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_amd64.tgz"
+            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           fi
           curl "$URL" -o tailscale.tgz
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_amd64
+          TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Start Tailscale Daemon
         shell: bash
