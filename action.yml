@@ -82,7 +82,7 @@ runs:
           if ! [[ "$SHA256SUM" ]] ; then
             SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256")"
           fi
-          curl -L "$URL" -H user-agent:tailscale-github-action -o tailscale.tgz --max-time 300
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
