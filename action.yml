@@ -29,7 +29,7 @@ runs:
           else
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_amd64.tgz"
           fi
-          curl $URL -o tailscale.tgz
+          curl -H user-agent:tailscale-github-action-v1 -L "$URL" -o tailscale.tgz
           tar -C ${HOME} -xzf tailscale.tgz
           rm tailscale.tgz
           TSPATH=${HOME}/tailscale_${VERSION}_amd64
