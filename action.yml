@@ -80,9 +80,9 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           fi
           if ! [[ "$SHA256SUM" ]] ; then
-            SHA256SUM="$(curl "${URL}.sha256")"
+            SHA256SUM="$(curl -L "${URL}.sha256")"
           fi
-          curl "$URL" -o tailscale.tgz --max-time 300
+          curl -L "$URL" -o tailscale.tgz --max-time 300
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
