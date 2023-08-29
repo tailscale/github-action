@@ -55,12 +55,9 @@ runs:
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
-      - name: Download Tailscale
+      - name: Set TS_ARCH variable
         shell: bash
-        id: download
-        env:
-          VERSION: ${{ inputs.version }}
-          SHA256SUM: ${{ inputs.sha256sum }}
+        id: arch
         run: |
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
@@ -73,6 +70,25 @@ runs:
           else
             TS_ARCH="amd64"
           fi
+          echo "TS_ARCH=${TS_ARCH}" >> "$GITHUB_ENV"
+      - name: Cache tailscale binary
+        id: cache-binary
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-tailscale
+        with:
+          path: |
+            ${{ runner.temp }}/tailscale_${{inputs.version}}_${{env.TS_ARCH}}/
+          key: tailscale-${{ inputs.version }}-${{ env.TS_ARCH }}-${{ inputs.sha256sum }}
+      - name: Download Tailscale
+        if: ${{ steps.cache-binary.outputs.cache-hit != 'true' }}
+        shell: bash
+        id: download
+        env:
+          VERSION: ${{ inputs.version }}
+          SHA256SUM: ${{ inputs.sha256sum }}
+          TEMP_DIRECTORY: ${{ runner.temp }}
+        run: |
           MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
             URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
@@ -84,10 +100,14 @@ runs:
           fi
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
-          tar -C /tmp -xzf tailscale.tgz
+          tar -C $TEMP_DIRECTORY/ -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
-          sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+      - name: Copy Tailscale
+        shell: bash
+        id: copy-binary
+        env:
+          TSPATH: ${{ runner.temp }}/tailscale_${{inputs.version}}_${{env.TS_ARCH}}
+        run: sudo cp "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Start Tailscale Daemon
         shell: bash
         env:
