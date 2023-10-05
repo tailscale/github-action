@@ -83,6 +83,8 @@ runs:
             SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256")"
           fi
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300
+          echo "Expected sha256: $SHA256SUM"
+          echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
