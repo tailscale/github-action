@@ -23,7 +23,7 @@ inputs:
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.66.3'
+    default: '1.66.4'
   sha256sum:
     description: 'Expected SHA256 checksum of the tarball.'
     required: false
