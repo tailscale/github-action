@@ -61,7 +61,8 @@ Here is an example of `renovate.json` that will look for the version string and 
       "fileMatch": ["^(workflow-templates|\.(?:github|gitea|forgejo)/workflows)/[^/]+\.ya?ml$"],
       "matchStrings": ["uses: tailscale\\/github-action@v2(?:\\s+.*\\n)*?.*version: (?<currentValue>.*?)\\n"],
       "depNameTemplate": "tailscale/tailscale",
-      "datasourceTemplate": "github-releases"
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "v(?<version>.*)"
     }
   ]
 }
