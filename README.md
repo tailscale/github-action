@@ -26,3 +26,17 @@ Nodes created by this Action are [marked as Ephemeral](https://tailscale.com/s/e
 be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
+
+## Defining Tailscale version
+
+Which Tailscale version to use can be set like this:
+
+```yaml
+  - name: Tailscale
+    uses: tailscale/github-action@v2
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      tags: tag:ci
+      version: 1.52.0
+```
