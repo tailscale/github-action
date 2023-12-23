@@ -96,8 +96,7 @@ runs:
           TSPATH: ${{ steps.download.outputs.TSPATH }}
         run: |
           ls -al ${TSPATH}
-          ${TSPATH}/tailscaled --state=mem: --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
-          cat ~/tailscaled.log
+          ${TSPATH}/tailscaled --state=mem: --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 ${ADDITIONAL_DAEMON_ARGS} &
           # And check that tailscaled came up. The CLI will block for a bit waiting
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
