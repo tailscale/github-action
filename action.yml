@@ -99,7 +99,7 @@ runs:
           # And check that tailscaled came up. The CLI will block for a bit waiting
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
-          ${TSPATH}/tailscale status --socket "${TSPATH}/tailscaled.sock" --json >/dev/null
+          ${TSPATH}/tailscale --socket=${TSPATH}/tailscaled.sock status --json >/dev/null
       - name: Connect to Tailscale
         shell: bash
         env:
@@ -116,4 +116,4 @@ runs:
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
-          timeout 5m ${TSPATH}/tailscale up --socket=${TSPATH}/tailscaled.sock ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          timeout 5m ${TSPATH}/tailscale --socket=${TSPATH}/tailscaled.sock up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
