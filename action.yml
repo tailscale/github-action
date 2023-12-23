@@ -88,18 +88,18 @@ runs:
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
-          mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/local/bin
+          echo "TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}" >> "$GITHUB_OUTPUT"
       - name: Start Tailscale Daemon
         shell: bash
         env:
           ADDITIONAL_DAEMON_ARGS: ${{ inputs.tailscaled-args }}
+          TSPATH: ${{ steps.download.outputs.TSPATH }}
         run: |
-          tailscaled --state=mem: --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
+          ${TSPATH}/tailscaled --state=mem: --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
           # And check that tailscaled came up. The CLI will block for a bit waiting
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
-          tailscale status --json >/dev/null
+          ${TSPATH}/tailscale status --json >/dev/null
       - name: Connect to Tailscale
         shell: bash
         env:
@@ -107,6 +107,7 @@ runs:
           ADDITIONAL_ARGS: ${{ inputs.args }}
           HOSTNAME: ${{ inputs.hostname }}
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
+          TSPATH: ${{ steps.download.outputs.TSPATH }}
         run: |
           if [ -z "${HOSTNAME}" ]; then
             HOSTNAME="github-$(cat /etc/hostname)"
@@ -115,4 +116,4 @@ runs:
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
-          timeout 5m tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          timeout 5m ${TSPATH}/tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
