@@ -17,10 +17,21 @@ Subsequent steps in the Action can then access nodes in your Tailnet.
 oauth-client-id and oauth-secret are an [OAuth client](https://tailscale.com/s/oauth-clients/)
 for the tailnet to be accessed. We recommend storing these as
 [GitHub Encrypted Secrets.](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+When you make the OAuth client,
+you will need to grant write access to Devices so that the node this action creates can be tagged.
 
 tags is a comma-separated list of one or more [ACL Tags](https://tailscale.com/kb/1068/acl-tags/)
-for the node. At least one tag is required: an OAuth client is not associated
-with any of the Users on the tailnet, it has to Tag its nodes.
+for the node.
+At least one tag is required, and the policy file needs to allow tags to be applied.
+For `tag:ci`, the policy files needs to include something like
+
+```
+"tagOwners": {
+   ...
+   "tag:ci": ["autogroup:admin"],
+   ...
+}
+```
 
 Nodes created by this Action are [marked as Ephemeral](https://tailscale.com/s/ephemeral-nodes) to
 be automatically removed by the coordination server a short time after they
