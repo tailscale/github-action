@@ -40,3 +40,6 @@ Which Tailscale version to use can be set like this:
       tags: tag:ci
       version: 1.52.0
 ```
+
+You can find the latest Tailscale stable version number at
+https://pkgs.tailscale.com/stable/#static.
