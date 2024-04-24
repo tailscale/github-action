@@ -79,10 +79,11 @@ runs:
           else
             URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           fi
+          echo "Downloading $URL"
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
           if ! [[ "$SHA256SUM" ]] ; then
-            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256")"
+            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256" --fail)"
           fi
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
