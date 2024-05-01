@@ -20,12 +20,16 @@ inputs:
   tags:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
+  download:
+    description: 'Whether to download the `tailscale` and `tailscaled` binaries.'
+    required: false
+    default: 'true'
   version:
-    description: 'Tailscale version to use.'
+    description: 'Tailscale version to use if downloading.'
     required: true
     default: '1.42.0'
   sha256sum:
-    description: 'Expected SHA256 checksum of the tarball.'
+    description: 'Expected SHA256 checksum of the tarball when downloading.'
     required: false
     default: ''
   args:
@@ -57,7 +61,7 @@ runs:
           exit 1
       - name: Download Tailscale
         shell: bash
-        id: download
+        if: ${{ inputs.download }}
         env:
           VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
