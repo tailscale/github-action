@@ -97,6 +97,14 @@ runs:
         rm tailscale.tgz
         TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
         sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+    - name: Link Tailscale binaries
+      shell: bash
+      if: ${{ inputs.download == 'false' }}
+      run: |
+        TAILSCALE_PATH=$(which tailscale)
+        TAILSCALED_PATH=$(which tailscaled)
+        sudo -E ln -s -f ${TAILSCALE_PATH} /usr/bin/tailscale
+        sudo -E ln -s -f ${TAILSCALED_PATH} /usr/bin/tailscaled
     - name: Start Tailscale Daemon
       shell: bash
       env:
