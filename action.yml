@@ -51,13 +51,13 @@ runs:
         if: ${{ runner.os != 'Linux' }}
         shell: bash
         run: |
-          echo '::error title=⛔ error hint::Support Linux Only'
+          echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
         shell: bash
         run: |
-          echo '::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients'
+          echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
       - name: Download Tailscale
         shell: bash
@@ -66,35 +66,35 @@ runs:
           VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
-          if [ ${{ runner.arch }} = 'ARM64' ]; then
-            TS_ARCH='arm64'
-          elif [ ${{ runner.arch }} = 'ARM' ]; then
-            TS_ARCH='arm'
-          elif [ ${{ runner.arch }} = 'X86' ]; then
-            TS_ARCH='386'
-          elif [ ${{ runner.arch }} = 'X64' ]; then
-            TS_ARCH='amd64'
+          if [ ${{ runner.arch }} = "ARM64" ]; then
+            TS_ARCH="arm64"
+          elif [ ${{ runner.arch }} = "ARM" ]; then
+            TS_ARCH="arm"
+          elif [ ${{ runner.arch }} = "X86" ]; then
+            TS_ARCH="386"
+          elif [ ${{ runner.arch }} = "X64" ]; then
+            TS_ARCH="amd64"
           else
-            TS_ARCH='amd64'
+            TS_ARCH="amd64"
           fi
-          MINOR=$(echo '$VERSION' | awk -F '.' {'print $2'})
+          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
-            URL='https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz'
+            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           else
-            URL='https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz'
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           fi
-          echo 'Downloading $URL'
-          curl -H user-agent:tailscale-github-action -L '$URL' -o tailscale.tgz --max-time 300 --fail
-          if ! [[ '$SHA256SUM' ]] ; then
-            SHA256SUM='$(curl -H user-agent:tailscale-github-action -L '${URL}.sha256' --fail)'
+          echo "Downloading $URL"
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
+          if ! [[ "$SHA256SUM" ]] ; then
+            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256" --fail)"
           fi
-          echo 'Expected sha256: $SHA256SUM'
-          echo 'Actual sha256: $(sha256sum tailscale.tgz)'
-          echo '$SHA256SUM  tailscale.tgz' | sha256sum -c
+          echo "Expected sha256: $SHA256SUM"
+          echo "Actual sha256: $(sha256sum tailscale.tgz)"
+          echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
-          sudo mv '${TSPATH}/tailscale' '${TSPATH}/tailscaled' /usr/bin
+          sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Link Tailscale binaries
         shell: bash
         if: ${{ inputs.download == 'false' }}
