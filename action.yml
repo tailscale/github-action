@@ -121,11 +121,11 @@ runs:
           HOSTNAME: ${{ inputs.hostname }}
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
         run: |
-          if [ -z '${HOSTNAME}' ]; then
-            HOSTNAME='github-$(cat /etc/hostname)'
+          if [ -z "${HOSTNAME}" ]; then
+            HOSTNAME="github-$(cat /etc/hostname)"
           fi
-          if [ -n '${{ inputs['oauth-secret'] }}' ]; then
-            TAILSCALE_AUTHKEY='${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true'
-            TAGS_ARG='--advertise-tags=${{ inputs.tags }}'
+          if [ -n "${{ inputs['oauth-secret'] }}" ]; then
+            TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
+            TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
           timeout 5m sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
