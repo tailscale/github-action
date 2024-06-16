@@ -29,7 +29,7 @@ inputs:
   version:
     description: "Tailscale version to use if downloading."
     required: true
-    default: "1.42.0"
+    default: '1.66.3'
   sha256sum:
     description: "Expected SHA256 checksum of the tarball when downloading."
     required: false
