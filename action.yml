@@ -101,8 +101,12 @@ runs:
         run: |
           TAILSCALE_PATH=$(which tailscale)
           TAILSCALED_PATH=$(which tailscaled)
-          sudo -E ln -s -f ${TAILSCALE_PATH} /usr/bin/tailscale
-          sudo -E ln -s -f ${TAILSCALED_PATH} /usr/bin/tailscaled
+          if [[ ! -f /usr/bin/tailscale ]]; then
+            sudo -E ln -s -f ${TAILSCALE_PATH} /usr/bin/tailscale
+          fi
+          if [[ ! -f /usr/bin/tailscaled ]]; then
+            sudo -E ln -s -f ${TAILSCALED_PATH} /usr/bin/tailscaled
+          fi
       - name: Start Tailscale Daemon
         shell: bash
         env:
