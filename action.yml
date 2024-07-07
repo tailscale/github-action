@@ -23,7 +23,7 @@ inputs:
   version:
     description: 'Tailscale version to use.'
     required: true
-    default: '1.66.3'
+    default: 'latest'
   sha256sum:
     description: 'Expected SHA256 checksum of the tarball.'
     required: false
@@ -62,6 +62,10 @@ runs:
           VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
+          if [ "$VERSION" = "latest" ]; then
+            VERSION=$(curl -s https://pkgs.tailscale.com/stable/ | grep -o 'value="[0-9.]*"' | sed 's/value="//;s/"//' | sort -V | tail -n 1)
+            echo "Latest Tailscale version: $VERSION"
+          fi
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
           elif [ ${{ runner.arch }} = "ARM" ]; then
