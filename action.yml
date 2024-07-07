@@ -21,9 +21,9 @@ inputs:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
   version:
-    description: 'Tailscale version to use.'
+    description: 'Tailscale version to use. Specify `latest` to use the latest stable version.'
     required: true
-    default: 'latest'
+    default: '1.66.3'
   sha256sum:
     description: 'Expected SHA256 checksum of the tarball.'
     required: false
