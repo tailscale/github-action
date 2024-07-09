@@ -27,6 +27,26 @@ be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
 
+## Tailnet Lock
+
+If you are using this Action in a [Tailnet
+Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
+
+* Authenticate using an ephemeral reusable [pre-signed auth key](
+  https://tailscale.com/kb/1226/tailnet-lock#add-a-node-using-a-pre-signed-auth-key)
+  rather than an OAuth client.
+* Specify a [state directory](
+  https://tailscale.com/kb/1278/tailscaled#flags-to-tailscaled) for the
+  client to store the Tailnet Key Authority data in.
+
+```yaml
+  - name: Tailscale
+    uses: tailscale/github-action@v2
+    with:
+      authkey: tskey-auth-...
+      statedir: /tmp/tailscale-state/
+```
+
 ## Defining Tailscale version
 
 Which Tailscale version to use can be set like this:
