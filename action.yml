@@ -44,6 +44,10 @@ inputs:
     description: 'Optional state directory to use (if unset, memory state is used)'
     required: false
     default: ''
+  timeout:
+    description: 'Timeout for `tailscale up`'
+    required: false
+    default: '2m'
 runs:
     using: 'composite'
     steps:
@@ -115,9 +119,10 @@ runs:
       - name: Connect to Tailscale
         shell: bash
         env:
-          TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           ADDITIONAL_ARGS: ${{ inputs.args }}
           HOSTNAME: ${{ inputs.hostname }}
+          TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
+          TIMEOUT: ${{ inputs.timeout }}
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
         run: |
           if [ -z "${HOSTNAME}" ]; then
@@ -127,4 +132,4 @@ runs:
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
-          timeout 5m sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          timeout --verbose --kill-after=1s ${TIMEOUT} sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
