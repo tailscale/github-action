@@ -20,12 +20,16 @@ inputs:
   tags:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
+  download:
+    description: 'Whether to download the `tailscale` and `tailscaled` binaries.'
+    required: false
+    default: 'true'
   version:
-    description: 'Tailscale version to use.'
+    description: 'Tailscale version to use if downloading.'
     required: true
     default: '1.72.1'
   sha256sum:
-    description: 'Expected SHA256 checksum of the tarball.'
+    description: 'Expected SHA256 checksum of the tarball when downloading.'
     required: false
     default: ''
   args:
@@ -65,7 +69,7 @@ runs:
           exit 1
       - name: Download Tailscale
         shell: bash
-        id: download
+        if: ${{ inputs.download == 'true' }}
         env:
           VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
@@ -99,6 +103,18 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+      - name: Link Tailscale binaries
+        shell: bash
+        if: ${{ inputs.download == 'false' }}
+        run: |
+          TAILSCALE_PATH=$(which tailscale)
+          TAILSCALED_PATH=$(which tailscaled)
+          if [[ ! -f /usr/bin/tailscale ]]; then
+            sudo -E ln -s -f ${TAILSCALE_PATH} /usr/bin/tailscale
+          fi
+          if [[ ! -f /usr/bin/tailscaled ]]; then
+            sudo -E ln -s -f ${TAILSCALED_PATH} /usr/bin/tailscaled
+          fi
       - name: Start Tailscale Daemon
         shell: bash
         env:
