@@ -58,10 +58,16 @@ runs:
           echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
       - name: Check Auth Info Empty
-        if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
+        if: ${{ inputs.authkey == '' && inputs['oauth-secret'] == '' }}
         shell: bash
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
+          exit 1
+      - name: Check Tags Provided
+        if: ${{ inputs.authkey == '' && inputs.tags == '' }}
+        shell: bash
+        run: |
+          echo "::error title=⛔ error hint::At least one ACL tag is required for nodes created by this Action. Ensure an appropriate tag exists in your ACL and provide it in your workflow. See more in https://tailscale.com/kb/1068/acl-tags/"
           exit 1
       - name: Download Tailscale
         shell: bash
