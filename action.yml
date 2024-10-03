@@ -94,7 +94,9 @@ runs:
       - name: Download Tailscale
         if: ${{ runner.os == 'macOS' }}
         shell: bash
-        run: brew install coreutils go && export PATH=$(go env GOROOT)/bin:$(go env GOPATH)/bin:$PATH # timeout comes with coreutils
+        run: |
+          brew install coreutils go
+          echo "PATH=$(go env GOROOT)/bin:$(go env GOPATH)/bin:$PATH" >> $GITHUB_ENV # Export PATH to GitHub Actions environment
       - name: Install Tailscale
         shell: bash
         run: go install tailscale.com/cmd/tailscale{,d}@v1.68.2
