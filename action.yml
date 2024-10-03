@@ -94,7 +94,7 @@ runs:
       - name: Download Tailscale
         if: ${{ runner.os == 'macOS' }}
         shell: bash
-        run: brew install tailscale coreutils # timeout comes with coreutils
+        run: brew install tailscale@1.68.2 coreutils # timeout comes with coreutils
       - name: Start Tailscale Daemon
         shell: bash
         env:
