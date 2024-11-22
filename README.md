@@ -15,7 +15,7 @@ by adding a step to your workflow.
 Subsequent steps in the Action can then access nodes in your Tailnet.
 
 oauth-client-id and oauth-secret are an [OAuth client](https://tailscale.com/s/oauth-clients/)
-for the tailnet to be accessed. We recommend storing these as
+for the tailnet to be accessed. Required scope: `device` (read and write). We recommend storing these as
 [GitHub Encrypted Secrets.](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
 OAuth clients used for this purpose must have the
 [`auth_keys` scope.](https://tailscale.com/kb/1215/oauth-clients#scopes)
