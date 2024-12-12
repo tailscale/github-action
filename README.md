@@ -25,7 +25,7 @@ with any of the Users on the tailnet, it has to Tag its nodes.
 Nodes created by this Action are [marked as Ephemeral](https://tailscale.com/s/ephemeral-nodes) to
 be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
-on Tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
+on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
 
 ## Defining Tailscale version
 

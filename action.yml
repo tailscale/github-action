@@ -63,7 +63,7 @@ runs:
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
           if [ "$VERSION" = "latest" ]; then
-            VERSION=$(curl -s https://pkgs.tailscale.com/stable/ | grep -o 'value="[0-9.]*"' | sed 's/value="//;s/"//' | sort -V | tail -n 1)
+            VERSION=$(curl -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
             echo "Latest Tailscale version: $VERSION"
           fi
           if [ ${{ runner.arch }} = "ARM64" ]; then
