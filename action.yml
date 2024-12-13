@@ -21,7 +21,7 @@ inputs:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
   version:
-    description: 'Tailscale version to use.'
+    description: 'Tailscale version to use. Specify `latest` to use the latest stable version.'
     required: true
     default: '1.72.1'
   sha256sum:
@@ -70,6 +70,10 @@ runs:
           VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
+          if [ "$VERSION" = "latest" ]; then
+            VERSION=$(curl -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
+            echo "Latest Tailscale version: $VERSION"
+          fi
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
           elif [ ${{ runner.arch }} = "ARM" ]; then
