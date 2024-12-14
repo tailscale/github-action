@@ -52,10 +52,10 @@ runs:
     using: 'composite'
     steps:
       - name: Check Runner OS
-        if: ${{ runner.os != 'Linux' }}
+        if: ${{ runner.os != 'Linux' && runner.os != 'macOS'}}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::Support Linux Only"
+          echo "::error title=⛔ error hint::Support Linux or macOS Only"
           exit 1
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
@@ -63,7 +63,8 @@ runs:
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
-      - name: Download Tailscale
+      - name: Linux - Download Tailscale
+        if: ${{ runner.os == 'Linux' }}
         shell: bash
         id: download
         env:
@@ -103,6 +104,23 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+      - name: MacOS - Download dependencies
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run:
+          brew install coreutils  # for 'timeout'
+      - name: MacOS - Setup Go 1.23.x
+        if: ${{ runner.os == 'macOS' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: MacOS - Build open source tailscaled
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: 
+          go install tailscale.com/cmd/tailscale{,d}@v$VERSION
       - name: Start Tailscale Daemon
         shell: bash
         env:
@@ -130,10 +148,15 @@ runs:
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
         run: |
           if [ -z "${HOSTNAME}" ]; then
-            HOSTNAME="github-$(cat /etc/hostname)"
+            HOSTNAME="github-$(hostname)"
           fi
           if [ -n "${{ inputs['oauth-secret'] }}" ]; then
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
           timeout --verbose --kill-after=1s ${TIMEOUT} sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+      - name: MacOS - enable Tailscale DNS
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run:
+          networksetup -setdnsservers "Ethernet" 100.100.100.100
