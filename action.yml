@@ -52,7 +52,7 @@ runs:
     using: 'composite'
     steps:
       - name: Check Runner OS
-        if: ${{ runner.os != 'Linux' }}
+        if: ${{ runner.os != 'Linux' && runner.os != 'macOS' }}
         shell: bash
         run: |
           echo "::error title=⛔ error hint::Support Linux Only"
@@ -64,6 +64,7 @@ runs:
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
       - name: Download Tailscale
+        if: ${{ runner.os == 'Linux' }}
         shell: bash
         id: download
         env:
@@ -103,6 +104,15 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+      - name: Download Tailscale
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          brew install coreutils go
+          echo "PATH=$(go env GOROOT)/bin:$(go env GOPATH)/bin:$PATH" >> $GITHUB_ENV # Export PATH to GitHub Actions environment
+      - name: Install Tailscale
+        shell: bash
+        run: go install tailscale.com/cmd/tailscale{,d}@v1.68.2
       - name: Start Tailscale Daemon
         shell: bash
         env:
@@ -130,7 +140,11 @@ runs:
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
         run: |
           if [ -z "${HOSTNAME}" ]; then
-            HOSTNAME="github-$(cat /etc/hostname)"
+            if [ -f /etc/hostname ]; then
+              HOSTNAME="github-$(cat /etc/hostname)"
+            else
+              HOSTNAME="github-$(hostname)"
+            fi
           fi
           if [ -n "${{ inputs['oauth-secret'] }}" ]; then
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
