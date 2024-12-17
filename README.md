@@ -4,12 +4,12 @@ This GitHub Action connects to your [Tailscale network](https://tailscale.com)
 by adding a step to your workflow.
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v2
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
+- name: Tailscale
+  uses: tailscale/github-action@v2
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
 ```
 
 Subsequent steps in the Action can then access nodes in your Tailnet.
@@ -41,38 +41,38 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
   https://tailscale.com/kb/1278/tailscaled#flags-to-tailscaled) for the
   client to store the Tailnet Key Authority data in.
 
-```yaml
+  ```yaml
   - name: Tailscale
     uses: tailscale/github-action@v2
     with:
       authkey: tskey-auth-...
       statedir: /tmp/tailscale-state/
-```
+  ```
 
 ## Defining Tailscale version
 
 Which Tailscale version to use can be set like this:
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v2
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: 1.52.0
+- name: Tailscale
+  uses: tailscale/github-action@v2
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: 1.52.0
 ```
 
 If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v2
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: latest
+- name: Tailscale
+  uses: tailscale/github-action@v2
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: latest
 ```
 
 You can find the latest Tailscale stable version number at
