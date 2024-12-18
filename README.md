@@ -5,7 +5,7 @@ by adding a step to your workflow.
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v2
+    uses: tailscale/github-action@v3
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -43,7 +43,7 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v2
+    uses: tailscale/github-action@v3
     with:
       authkey: tskey-auth-...
       statedir: /tmp/tailscale-state/
@@ -55,7 +55,7 @@ Which Tailscale version to use can be set like this:
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v2
+    uses: tailscale/github-action@v3
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -67,7 +67,7 @@ If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v2
+    uses: tailscale/github-action@v3
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
