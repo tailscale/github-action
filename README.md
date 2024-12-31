@@ -1,4 +1,4 @@
-# Tailscale GitHub Action
+tab# Tailscale GitHub Action
 
 This GitHub Action connects to your [Tailscale network](https://tailscale.com)
 by adding a step to your workflow.
@@ -29,7 +29,7 @@ be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
 
-## Tailnet Lock
+esc## Tailnet Lock
 
 If you are using this Action in a [Tailnet
 Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
@@ -49,7 +49,7 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
       statedir: /tmp/tailscale-state/
 ```
 
-## Defining Tailscale version
+tab## Defining Tailscale version
 
 Which Tailscale version to use can be set like this:
 
