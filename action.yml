@@ -1,4 +1,4 @@
-# Copyright (c) Tailscale Inc & AUTHORS
+tab# Copyright (c) Tailscale Inc & AUTHORS
 # SPDX-License-Identifier: BSD-3-Clause
 #
 name: 'Connect Tailscale'
@@ -55,7 +55,7 @@ runs:
         if: ${{ runner.os != 'Linux' }}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::Support Linux Only"
+         esc echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
@@ -89,7 +89,7 @@ runs:
           if [ $((MINOR % 2)) -eq 0 ]; then
             URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
+           tab URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
           fi
           echo "Downloading $URL"
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
