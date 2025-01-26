@@ -130,7 +130,6 @@ runs:
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
           sudo -E tailscale status --json >/dev/null
-  
       - name: Connect to Tailscale
         shell: bash
         env:
