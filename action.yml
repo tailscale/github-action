@@ -57,7 +57,6 @@ runs:
         run: |
           echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
-  
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
         shell: bash
