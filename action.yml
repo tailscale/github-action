@@ -113,7 +113,6 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
-  
       - name: Start Tailscale Daemon
         shell: bash
         env:
