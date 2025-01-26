@@ -57,12 +57,23 @@ runs:
         run: |
           echo "::error title=⛔ error hint::Support Linux Only"
           exit 1
+  
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
+          echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encry[...]
           exit 1
+  
+      - name: Cache Tailscale Binary
+        uses: actions/cache@v3
+        with:
+          path: /tmp/tailscale_${{ inputs.version }}_${{ runner.arch }}
+          key: ${{ runner.os }}-tailscale-${{ inputs.version }}-${{ runner.arch }}
+          restore-keys: |
+            ${{ runner.os }}-tailscale-${{ inputs.version }}-
+            ${{ runner.os }}-tailscale-
+  
       - name: Download Tailscale
         shell: bash
         id: download
@@ -103,6 +114,7 @@ runs:
           rm tailscale.tgz
           TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
+  
       - name: Start Tailscale Daemon
         shell: bash
         env:
@@ -120,6 +132,7 @@ runs:
           # for it. And --json will make it exit with status 0 even if we're logged
           # out (as we will be). Without --json it returns an error if we're not up.
           sudo -E tailscale status --json >/dev/null
+  
       - name: Connect to Tailscale
         shell: bash
         env:
