@@ -51,77 +51,14 @@ inputs:
 runs:
     using: 'composite'
     steps:
-      - name: Check Runner OS
-        if: ${{ runner.os != 'Linux' }}
-        shell: bash
-        run: |
-          echo "::error title=⛔ error hint::Support Linux Only"
-          exit 1
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
         shell: bash
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
-      - name: Download Tailscale
-        shell: bash
-        id: download
-        env:
-          VERSION: ${{ inputs.version }}
-          SHA256SUM: ${{ inputs.sha256sum }}
-        run: |
-          if [ "$VERSION" = "latest" ]; then
-            VERSION=$(curl -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
-            echo "Latest Tailscale version: $VERSION"
-          fi
-          if [ ${{ runner.arch }} = "ARM64" ]; then
-            TS_ARCH="arm64"
-          elif [ ${{ runner.arch }} = "ARM" ]; then
-            TS_ARCH="arm"
-          elif [ ${{ runner.arch }} = "X86" ]; then
-            TS_ARCH="386"
-          elif [ ${{ runner.arch }} = "X64" ]; then
-            TS_ARCH="amd64"
-          else
-            TS_ARCH="amd64"
-          fi
-          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
-          if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
-          else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
-          fi
-          echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
-          if ! [[ "$SHA256SUM" ]] ; then
-            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256" --fail)"
-          fi
-          echo "Expected sha256: $SHA256SUM"
-          echo "Actual sha256: $(sha256sum tailscale.tgz)"
-          echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
-          tar -C /tmp -xzf tailscale.tgz
-          rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
-          sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
-      - name: Start Tailscale Daemon
-        shell: bash
-        env:
-          ADDITIONAL_DAEMON_ARGS: ${{ inputs.tailscaled-args }}
-          STATEDIR: ${{ inputs.statedir }}
-        run: |
-          if [ "$STATEDIR" == "" ]; then
-            STATE_ARGS="--state=mem:"
-          else
-            STATE_ARGS="--statedir=${STATEDIR}"
-            mkdir -p "$STATEDIR"
-          fi
-          sudo -E tailscaled ${STATE_ARGS} ${ADDITIONAL_DAEMON_ARGS} 2>~/tailscaled.log &
-          # And check that tailscaled came up. The CLI will block for a bit waiting
-          # for it. And --json will make it exit with status 0 even if we're logged
-          # out (as we will be). Without --json it returns an error if we're not up.
-          sudo -E tailscale status --json >/dev/null
       - name: Connect to Tailscale
-        shell: bash
+        shell: pwsh
         env:
           ADDITIONAL_ARGS: ${{ inputs.args }}
           HOSTNAME: ${{ inputs.hostname }}
@@ -129,11 +66,16 @@ runs:
           TIMEOUT: ${{ inputs.timeout }}
           TS_EXPERIMENT_OAUTH_AUTHKEY: true
         run: |
-          if [ -z "${HOSTNAME}" ]; then
-            HOSTNAME="github-$(cat /etc/hostname)"
-          fi
-          if [ -n "${{ inputs['oauth-secret'] }}" ]; then
-            TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
-            TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
-          fi
-          timeout --verbose --kill-after=1s ${TIMEOUT} sudo -E tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          choco install tailscale
+          Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+          refreshenv
+          $hostname = "${{ inputs.hostname }}"
+          if (-not "${HOSTNAME}" ) {
+            $hostname ="github-" + $env:computername
+          }
+          if ("${{ inputs['oauth-secret'] }}") {
+            $TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
+            $TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
+          }
+          Add-Content $env:GITHUB_PATH "C:\Program Files\Tailscale\"
+          tailscale up $TAGS_ARG --authkey=$TAILSCALE_AUTHKEY --hostname=$HOSTNAME --accept-routes ${{ inputs.args }}

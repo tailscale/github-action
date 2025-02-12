@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'mpminardi/windows-experiments'
   pull_request:
     branches:
       - '*'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -24,5 +24,6 @@ jobs:
           tags: tag:ci
 
       - name: check for hello.ts.net in netmap
-        run:
-          tailscale status | grep -q hello
+        run: |
+          tailscale status | grep hello
+        shell: bash
