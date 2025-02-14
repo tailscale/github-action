@@ -11,7 +11,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -24,5 +27,6 @@ jobs:
           tags: tag:ci
 
       - name: check for hello.ts.net in netmap
+        shell: bash
         run:
           tailscale status | grep -q hello
