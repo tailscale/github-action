@@ -52,10 +52,10 @@ runs:
     using: 'composite'
     steps:
       - name: Check Runner OS
-        if: ${{ runner.os != 'Linux' && runner.os != 'Windows' }}
+        if: ${{ runner.os != 'Linux' && runner.os != 'Windows' && runner.os != 'macOS'}}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::Support Linux or Windows Only"
+          echo "::error title=⛔ error hint::Support Linux, Windows, and macOS Only"
           exit 1
       - name: Check Auth Info Empty
         if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
@@ -63,17 +63,23 @@ runs:
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
+      - name: Set Resolved Version
+        shell: bash
+        run: |
+          VERSION=${{ inputs.version }}
+          if [ "$VERSION" = "latest" ]; then
+            RESOLVED_VERSION=$(curl -H user-agent:tailscale-github-action -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
+          else
+            RESOLVED_VERSION=$VERSION
+          fi
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+          echo "Resolved Tailscale version: $RESOLVED_VERSION"
       - name: Download Tailscale - Linux
         if: ${{ runner.os == 'Linux' }}
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
-          if [ "$VERSION" = "latest" ]; then
-            VERSION=$(curl -H user-agent:tailscale-github-action -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
-            echo "Latest Tailscale version: $VERSION"
-          fi
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
           elif [ ${{ runner.arch }} = "ARM" ]; then
@@ -83,11 +89,11 @@ runs:
           else
             TS_ARCH="amd64"
           fi
-          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
+          MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale_${VERSION}_${TS_ARCH}.tgz"
+            URL="https://pkgs.tailscale.com/stable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
           else
-            URL="https://pkgs.tailscale.com/unstable/tailscale_${VERSION}_${TS_ARCH}.tgz"
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
           fi
           echo "Downloading $URL"
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
@@ -99,19 +105,14 @@ runs:
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
           tar -C /tmp -xzf tailscale.tgz
           rm tailscale.tgz
-          TSPATH=/tmp/tailscale_${VERSION}_${TS_ARCH}
+          TSPATH=/tmp/tailscale_${RESOLVED_VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
       - name: Download Tailscale - Windows
         if: ${{ runner.os == 'Windows' }}
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
-          if [ "$VERSION" = "latest" ]; then
-            VERSION=$(curl -H user-agent:tailscale-github-action -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
-            echo "Latest Tailscale version: $VERSION"
-          fi
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
           elif [ ${{ runner.arch }} = "X86" ]; then
@@ -119,11 +120,11 @@ runs:
           else
             TS_ARCH="amd64"
           fi
-          MINOR=$(echo "$VERSION" | awk -F '.' {'print $2'})
+          MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
-            URL="https://pkgs.tailscale.com/stable/tailscale-setup-${VERSION}-${TS_ARCH}.msi"
+            URL="https://pkgs.tailscale.com/stable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
           else
-            URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${VERSION}-${TS_ARCH}.msi"
+            URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
           fi
           echo "Downloading $URL"
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --fail
@@ -140,8 +141,29 @@ runs:
           Start-Process "C:\Windows\System32\msiexec.exe" -Wait -ArgumentList @('/quiet', '/l*v tailscale.log', '/i', 'tailscale.msi')
           Add-Content $env:GITHUB_PATH "C:\Program Files\Tailscale\"
           Remove-Item tailscale.msi -Force;
-      - name: Start Tailscale Daemon - Linux
-        if: ${{ runner.os == 'Linux' }}
+      - name: Checkout Tailscale repo - macOS
+        if: ${{ runner.os == 'macOS' }}
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: tailscale/tailscale
+          path: ${{ github.workspace }}/tailscale
+          ref: v${{ env.RESOLVED_VERSION }}
+      - name: Build Tailscale binaries - macOS
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          cd tailscale
+          export TS_USE_TOOLCHAIN=1
+          ./build_dist.sh ./cmd/tailscale
+          ./build_dist.sh ./cmd/tailscaled
+          sudo mv tailscale tailscaled /usr/local/bin
+      - name: Install timeout - macOS
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run:
+          brew install coreutils  # for 'timeout'
+      - name: Start Tailscale Daemon - non-Windows
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
         env:
           ADDITIONAL_DAEMON_ARGS: ${{ inputs.tailscaled-args }}
@@ -167,17 +189,17 @@ runs:
           TIMEOUT: ${{ inputs.timeout }}
         run: |
           if [ -z "${HOSTNAME}" ]; then
-            if [ "${{ runner.os }}" == "Linux" ]; then
-              HOSTNAME="github-$(cat /etc/hostname)"
-            elif [ "${{ runner.os }}" == "Windows" ]; then
+            if [ "${{ runner.os }}" == "Windows" ]; then
               HOSTNAME="github-$COMPUTERNAME"
+            else 
+              HOSTNAME="github-$(hostname)"
             fi
           fi
           if [ -n "${{ inputs['oauth-secret'] }}" ]; then
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
-          if [ "${{ runner.os }}" == "Linux" ]; then
+          if [ "${{ runner.os }}" != "Windows" ]; then
             MAYBE_SUDO="sudo -E"
           fi
           timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
