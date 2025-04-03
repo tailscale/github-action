@@ -63,6 +63,7 @@ runs:
         run: |
           echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
+
       - name: Set Resolved Version
         shell: bash
         run: |
@@ -74,11 +75,9 @@ runs:
           fi
           echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
           echo "Resolved Tailscale version: $RESOLVED_VERSION"
-      - name: Download Tailscale - Linux
+      - name: Set Tailscale Architecture - Linux
         if: ${{ runner.os == 'Linux' }}
         shell: bash
-        env:
-          SHA256SUM: ${{ inputs.sha256sum }}
         run: |
           if [ ${{ runner.arch }} = "ARM64" ]; then
             TS_ARCH="arm64"
@@ -89,6 +88,35 @@ runs:
           else
             TS_ARCH="amd64"
           fi
+          echo "TS_ARCH=$TS_ARCH" >> $GITHUB_ENV
+
+      - name: Set Tailscale Architecture - Windows
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          if [ ${{ runner.arch }} = "ARM64" ]; then
+            TS_ARCH="arm64"
+          elif [ ${{ runner.arch }} = "X86" ]; then
+            TS_ARCH="x86"
+          else
+            TS_ARCH="amd64"
+          fi
+          echo "TS_ARCH=$TS_ARCH" >> $GITHUB_ENV
+
+      - name: Cache Tailscale Binary - Linux
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        id: cache-tailscale-linux
+        with:
+          path: tailscale.tgz
+          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}
+
+      - name: Download Tailscale - Linux
+        if: ${{ runner.os == 'Linux' && steps.cache-tailscale-linux.outputs.cache-hit != 'true' }}
+        shell: bash
+        env:
+          SHA256SUM: ${{ inputs.sha256sum }}
+        run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
             URL="https://pkgs.tailscale.com/stable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
@@ -103,23 +131,29 @@ runs:
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
+      
+      - name: Install Tailscale - Linux
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
           tar -C /tmp -xzf tailscale.tgz
-          rm tailscale.tgz
           TSPATH=/tmp/tailscale_${RESOLVED_VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
-      - name: Download Tailscale - Windows
+
+      - name: Cache Tailscale Binary - Windows
         if: ${{ runner.os == 'Windows' }}
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        id: cache-tailscale-windows
+        with:
+          path: tailscale.msi
+          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}
+
+      - name: Download Tailscale - Windows
+        if: ${{ runner.os == 'Windows' && steps.cache-tailscale-windows.outputs.cache-hit != 'true' }}
         shell: bash
         env:
           SHA256SUM: ${{ inputs.sha256sum }}
         run: |
-          if [ ${{ runner.arch }} = "ARM64" ]; then
-            TS_ARCH="arm64"
-          elif [ ${{ runner.arch }} = "X86" ]; then
-            TS_ARCH="x86"
-          else
-            TS_ARCH="amd64"
-          fi
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
             URL="https://pkgs.tailscale.com/stable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
