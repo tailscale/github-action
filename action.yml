@@ -103,19 +103,35 @@ runs:
           fi
           echo "TS_ARCH=$TS_ARCH" >> $GITHUB_ENV
 
+      - name: Set SHA256 - Linux
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
+          if [ $((MINOR % 2)) -eq 0 ]; then
+            URL="https://pkgs.tailscale.com/stable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz.sha256"
+          else
+            URL="https://pkgs.tailscale.com/unstable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz.sha256"
+          fi
+          
+          if [[ "${{ inputs.sha256sum }}" ]]; then
+            SHA256SUM="${{ inputs.sha256sum }}"
+          else
+            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}" --fail)"
+          fi
+          echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
+          
       - name: Cache Tailscale Binary - Linux
         if: ${{ runner.os == 'Linux' }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: cache-tailscale-linux
         with:
           path: tailscale.tgz
-          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}
+          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Linux
         if: ${{ runner.os == 'Linux' && steps.cache-tailscale-linux.outputs.cache-hit != 'true' }}
         shell: bash
-        env:
-          SHA256SUM: ${{ inputs.sha256sum }}
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
@@ -125,9 +141,6 @@ runs:
           fi
           echo "Downloading $URL"
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
-          if ! [[ "$SHA256SUM" ]] ; then
-            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256" --fail)"
-          fi
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
@@ -140,19 +153,35 @@ runs:
           TSPATH=/tmp/tailscale_${RESOLVED_VERSION}_${TS_ARCH}
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
 
+      - name: Set SHA256 - Windows
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
+          if [ $((MINOR % 2)) -eq 0 ]; then
+            URL="https://pkgs.tailscale.com/stable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi.sha256"
+          else
+            URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi.sha256"
+          fi
+          
+          if [[ "${{ inputs.sha256sum }}" ]]; then
+            SHA256SUM="${{ inputs.sha256sum }}"
+          else
+            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}" --fail)"
+          fi
+          echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
+
       - name: Cache Tailscale Binary - Windows
         if: ${{ runner.os == 'Windows' }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: cache-tailscale-windows
         with:
           path: tailscale.msi
-          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}
+          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Windows
         if: ${{ runner.os == 'Windows' && steps.cache-tailscale-windows.outputs.cache-hit != 'true' }}
         shell: bash
-        env:
-          SHA256SUM: ${{ inputs.sha256sum }}
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
           if [ $((MINOR % 2)) -eq 0 ]; then
@@ -162,9 +191,6 @@ runs:
           fi
           echo "Downloading $URL"
           curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --fail
-          if ! [[ "$SHA256SUM" ]] ; then
-            SHA256SUM="$(curl -H user-agent:tailscale-github-action -L "${URL}.sha256" --fail)"
-          fi
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.msi)"
           echo "$SHA256SUM  tailscale.msi" | sha256sum -c
