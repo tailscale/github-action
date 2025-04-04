@@ -48,6 +48,10 @@ inputs:
     description: 'Timeout for `tailscale up`'
     required: false
     default: '2m'
+  use-cache:
+    description: 'Whether to cache the Tailscale binaries (Linux/macOS) or installer (Windows)'
+    required: false
+    default: 'false'
 runs:
     using: 'composite'
     steps:
@@ -122,7 +126,7 @@ runs:
           echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
           
       - name: Cache Tailscale Binary - Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'Linux' }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: cache-tailscale-linux
         with:
@@ -130,7 +134,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Linux
-        if: ${{ runner.os == 'Linux' && steps.cache-tailscale-linux.outputs.cache-hit != 'true' }}
+        if: ${{ runner.os == 'Linux' && (inputs.use-cache != 'true' || steps.cache-tailscale-linux.outputs.cache-hit != 'true') }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -172,7 +176,7 @@ runs:
           echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
 
       - name: Cache Tailscale Binary - Windows
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'Windows' }}
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: cache-tailscale-windows
         with:
@@ -180,7 +184,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Windows
-        if: ${{ runner.os == 'Windows' && steps.cache-tailscale-windows.outputs.cache-hit != 'true' }}
+        if: ${{ runner.os == 'Windows' && (inputs.use-cache != 'true' || steps.cache-tailscale-windows.outputs.cache-hit != 'true') }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -202,14 +206,24 @@ runs:
           Add-Content $env:GITHUB_PATH "C:\Program Files\Tailscale\"
           Remove-Item tailscale.msi -Force;
       - name: Checkout Tailscale repo - macOS
+        id: checkout-tailscale-macos
         if: ${{ runner.os == 'macOS' }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: tailscale/tailscale
           path: ${{ github.workspace }}/tailscale
           ref: v${{ env.RESOLVED_VERSION }}
+      - name: Cache Tailscale - macOS
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'macOS' }}
+        id: cache-tailscale-macos
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            /usr/local/bin/tailscale
+            /usr/local/bin/tailscaled
+          key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ runner.arch }}-${{ steps.checkout-tailscale-macos.outputs.commit }}
       - name: Build Tailscale binaries - macOS
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && (inputs.use-cache != 'true' || steps.cache-tailscale-macos.outputs.cache-hit != 'true') }}
         shell: bash
         run: |
           cd tailscale
