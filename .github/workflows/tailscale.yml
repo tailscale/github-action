@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'mpminardi/test-caching'
   pull_request:
     branches:
       - '*'
@@ -25,6 +25,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          use-cache: 'true'
 
       - name: check for tailscale connection
         shell: bash
