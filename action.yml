@@ -204,7 +204,6 @@ runs:
         run: |
           Start-Process "C:\Windows\System32\msiexec.exe" -Wait -ArgumentList @('/quiet', '/l*v tailscale.log', '/i', 'tailscale.msi')
           Add-Content $env:GITHUB_PATH "C:\Program Files\Tailscale\"
-          Remove-Item tailscale.msi -Force;
       - name: Checkout Tailscale repo - macOS
         id: checkout-tailscale-macos
         if: ${{ runner.os == 'macOS' }}
