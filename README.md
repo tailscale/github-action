@@ -77,3 +77,19 @@ If you'd like to specify the latest version, simply set the version as `latest`
 
 You can find the latest Tailscale stable version number at
 https://pkgs.tailscale.com/stable/#static.
+
+
+## Cache Tailscale binaries
+
+Caching can reduce download times and download failures on runners with slower network connectivity. Although caching is not enabled by default, it is generally recommended.
+
+You can opt in to caching Tailscale binaries by passing `'true'` to the `use-cache` input:
+
+```yaml
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      use-cache: 'true'
+```
