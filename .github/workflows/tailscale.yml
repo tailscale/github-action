@@ -30,3 +30,8 @@ jobs:
         shell: bash
         run:
           tailscale status -json | jq -r .BackendState | grep -q Running
+
+      - name: ensure no dirty files remain
+        shell: bash
+        run:
+          test -z "$(git status --porcelain)"
