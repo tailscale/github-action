@@ -14,6 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        cache: ['false', 'true']
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
@@ -25,8 +26,19 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          use-cache: ${{ matrix.cache }}
 
       - name: check for tailscale connection
         shell: bash
         run:
           tailscale status -json | jq -r .BackendState | grep -q Running
+
+      - name: ensure no dirty files from Tailscale Action remain
+        shell: bash
+        run: |
+          extra_files=$(git ls-files . --exclude-standard --others)
+          if [ ! -z "$extra_files" ]; then
+            echo "::error::Unexpected extra files: $extra_files"
+            exit 1
+          fi
+
