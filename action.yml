@@ -144,7 +144,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --http1.1 --max-time 300 --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
@@ -203,7 +203,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --http1.1 --max-time 300 --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.msi)"
           echo "$SHA256SUM  tailscale.msi" | sha256sum -c
