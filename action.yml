@@ -48,6 +48,10 @@ inputs:
     description: 'Timeout for `tailscale up`'
     required: false
     default: '2m'
+  retry:
+    description: 'Number of retries for `tailscale up`'
+    required: false
+    default: '5'
   use-cache:
     description: 'Whether to cache the Tailscale binaries (Linux/macOS) or installer (Windows)'
     required: false
@@ -293,6 +297,7 @@ runs:
           HOSTNAME: ${{ inputs.hostname }}
           TAILSCALE_AUTHKEY: ${{ inputs.authkey }}
           TIMEOUT: ${{ inputs.timeout }}
+          RETRY: ${{ inputs.retry }}
         run: |
           if [ -z "${HOSTNAME}" ]; then
             if [ "${{ runner.os }}" == "Windows" ]; then
@@ -308,4 +313,9 @@ runs:
           if [ "${{ runner.os }}" != "Windows" ]; then
             MAYBE_SUDO="sudo -E"
           fi
-          timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS}
+          for ((i=1;i<=$RETRY;i++)); do
+            echo "Attempt $i to bring up Tailscale..."
+            timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS} && break
+            echo "Tailscale up failed. Retrying in $((i * 5)) seconds..."
+            sleep $((i * 5))
+          done
