@@ -313,9 +313,12 @@ runs:
           if [ "${{ runner.os }}" != "Windows" ]; then
             MAYBE_SUDO="sudo -E"
           fi
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            PLATFORM_SPECIFIC_ARGS="--unattended"
+          fi
           for ((i=1;i<=$RETRY;i++)); do
             echo "Attempt $i to bring up Tailscale..."
-            timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${ADDITIONAL_ARGS} && break
+            timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} tailscale up ${TAGS_ARG} --authkey=${TAILSCALE_AUTHKEY} --hostname=${HOSTNAME} --accept-routes ${PLATFORM_SPECIFIC_ARGS} ${ADDITIONAL_ARGS} && break
             echo "Tailscale up failed. Retrying in $((i * 5)) seconds..."
             sleep $((i * 5))
           done
