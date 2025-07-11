@@ -17,6 +17,15 @@ inputs:
   oauth-secret:
     description: 'Your Tailscale OAuth Client Secret.'
     required: false
+  oidc-client-id:
+    description: 'Your Tailscale OIDC Client ID.'
+    required: false
+  oidc-aud-claim:
+    description: 'Your Tailscale OIDC audience claim'
+    required: false
+  tailnet:
+    description: 'Your Tailscale tailnet name (e.g., example.com)'
+    required: false
   tags:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
@@ -66,11 +75,81 @@ runs:
           echo "::error title=⛔ error hint::Support Linux, Windows, and macOS Only"
           exit 1
       - name: Check Auth Info Empty
-        if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') }}
+        if: ${{ inputs.authkey == '' && (inputs['oauth-secret'] == '' || inputs.tags == '') && (inputs['oidc-client-id'] == '' || inputs['oidc-aud-claim'] == '') }}
         shell: bash
         run: |
-          echo "::error title=⛔ error hint::OAuth identity empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
+          echo "::error title=⛔ error hint::OAuth and OIDC identity are empty, Maybe you need to populate it in the Secrets for your workflow, see more in https://docs.github.com/en/actions/security-guides/encrypted-secrets and https://tailscale.com/s/oauth-clients"
           exit 1
+
+      - name: get OIDC token from GitHub Actions
+        if: ${{ inputs['oidc-client-id'] != '' && inputs['oidc-aud-claim'] != '' && inputs['oauth-secret'] == '' }}
+        shell: bash
+        run: |
+          JWT=$(curl -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${{ inputs['oidc-aud-claim'] }}" | jq -r '.value')
+          if [ -z "$JWT" ]; then
+            echo "::error title=⛔ error hint::Failed to get JWT from GitHub Actions OIDC provider"
+            exit 1
+          fi
+          echo "::add-mask::$JWT" # Mask the JWT in the logs
+          echo "JWT=$JWT" >> $GITHUB_ENV
+
+      - name: Exchange JWT OIDC token and get authkey
+        if: ${{ inputs['oidc-client-id'] != '' && inputs['oidc-aud-claim'] != '' }}
+        shell: bash
+        run: |
+          echo "Exchanging JWT OIDC token for short-lived API token..."
+          RESPONSE=$(curl -X POST https://api.tailscale.com/api/v2/oauth/token-exchange \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "client_id=${{ inputs['oidc-client-id'] }}" \
+            -d "jwt=$JWT")
+          export ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.access_token')
+          echo "::add-mask::$ACCESS_TOKEN" # Mask the access token in the logs
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "::error title=⛔ error hint::Failed to get ACCESS_TOKEN from OIDC token exchange, response: $RESPONSE"
+            exit 1
+          fi
+
+          echo "Retrieving authkey from Tailscale API"
+          
+          # Convert comma-separated tags to JSON array format
+          TAGS_JSON=$(echo "${{ inputs.tags }}" | sed 's/,/","/g' | sed 's/^/["/' | sed 's/$/"]/')
+          
+          # Make the API call and capture both the response and curl info
+          CURL_OUTPUT=$(curl -s -w "\n%{http_code}" -X POST https://api.tailscale.com/api/v2/tailnet/${{ inputs.tailnet }}/keys \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${ACCESS_TOKEN}" \
+            --data "{
+            \"keyType\": \"auth\",
+            \"capabilities\": {
+              \"devices\": {
+                \"create\": {
+                  \"reusable\": false,
+                  \"ephemeral\": true,
+                  \"preauthorized\": true,
+                  \"tags\": $TAGS_JSON
+                }
+              }
+            },
+            \"expirySeconds\": 3600
+          }")
+          
+          # Extract HTTP status code (last line) and JSON response (everything else)
+          HTTP_STATUS=$(echo "$CURL_OUTPUT" | tail -n1)
+          JSON_RESPONSE=$(echo "$CURL_OUTPUT" | sed '$d')
+          echo "::add-mask::$JSON_RESPONSE" # Mask the JSON response in the logs
+          
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error title=⛔ error hint::Tailscale API returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          
+          export AUTHKEY=$(echo "$JSON_RESPONSE" | jq -r '.key')
+          echo "::add-mask::$AUTHKEY" # Mask the auth key in the logs
+          if [ -z "$AUTHKEY" ] || [ "$AUTHKEY" = "null" ]; then
+            echo "::error title=⛔ error hint::Failed to get AUTHKEY from Tailscale API"
+            exit 1
+          fi
+          echo "AUTHKEY=$AUTHKEY" >> $GITHUB_ENV
 
       - name: Set Resolved Version
         shell: bash
@@ -308,6 +387,15 @@ runs:
           fi
           if [ -n "${{ inputs['oauth-secret'] }}" ]; then
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
+            TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
+          fi
+
+          if [ -n "${{ inputs['oidc-aud-claim'] }}" ] && [ -n "${{ inputs['oidc-client-id'] }}" ]; then
+            if [ -z "$AUTHKEY" ]; then
+              echo "::error title=⛔ error hint::Failed to get AUTHKEY from OIDC token exchange"
+              exit 1
+            fi
+            TAILSCALE_AUTHKEY="$AUTHKEY"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
           fi
           if [ "${{ runner.os }}" != "Windows" ]; then
