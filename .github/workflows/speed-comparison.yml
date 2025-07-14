@@ -78,6 +78,10 @@ jobs:
           timeout: "3m"
           retry: 3
           
+      - name: Status
+        run: tailscale status
+        shell: bash
+          
       - name: Calculate Our Action Time
         id: calculate-time
         run: |
@@ -136,6 +140,10 @@ jobs:
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
           tags: "tag:ci"
           version: "1.82.0"
+
+      - name: Status
+        run: tailscale status
+        shell: bash
           
       - name: Calculate Official Action Time
         id: calculate-time
