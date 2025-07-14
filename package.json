@@ -1,0 +1,31 @@
+{
+  "name": "action-tailscale",
+  "version": "0.0.1",
+  "description": "Install Tailscale and connect to a tailnet",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "ncc build src/main.ts -o dist && ncc build src/logout/logout.ts -o dist/logout"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaxxstorm/action-setup-tailscale"
+  },
+  "author": "Lee Briggs",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@actions/cache": "^4.0.0",
+    "@actions/core": "^1.10.1", 
+    "@actions/exec": "^1.1.1",
+    "@actions/github": "^6.0.1",
+    "@actions/tool-cache": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "glob": "^10.3.10",
+    "inflight": "npm:@isaacs/inflight@^1.0.6"
+  }
+}

@@ -1,0 +1,56 @@
+name: "Smoke Tests"
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  # Basic smoke test that doesn't require secrets
+  smoke-test:
+    name: Smoke Test (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Build Action
+        run: npm run build
+      
+      - name: Test Action Loading (No Auth)
+        uses: ./
+        with:
+          version: "1.82.0"
+        continue-on-error: true
+        id: smoke-test
+
+      # The action should fail gracefully with a proper error message
+      - name: Verify Expected Failure
+        shell: bash
+        run: |
+          if [ "${{ steps.smoke-test.outcome }}" == "success" ]; then
+            echo "❌ Expected action to fail without authentication, but it succeeded"
+            exit 1
+          else
+            echo "✅ Action correctly failed without authentication as expected"
+          fi
+      
+
+ 
