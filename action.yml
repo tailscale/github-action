@@ -1,4 +1,4 @@
-name: 'Connect Tailscale'
+name: 'Action Setup Tailscale'
 description: 'Connect your GitHub Action workflow to Tailscale'
 branding:
   icon: 'arrow-right-circle'
