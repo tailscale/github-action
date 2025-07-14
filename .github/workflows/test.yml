@@ -115,10 +115,6 @@ jobs:
           # Test on a subset of platforms for speed comparison
           - os: ubuntu-latest
             runner-os: Linux
-          - os: windows-latest
-            runner-os: Windows
-          - os: macos-14
-            runner-os: macOS
     
     runs-on: ${{ matrix.os }}
     
