@@ -1,0 +1,61 @@
+name: 'Connect Tailscale'
+description: 'Connect your GitHub Action workflow to Tailscale'
+branding:
+  icon: 'arrow-right-circle'
+  color: 'gray-dark'
+
+inputs:
+  authkey:
+    description: 'Your Tailscale authentication key, from the admin panel.'
+    required: false
+    deprecationMessage: 'An OAuth API client https://tailscale.com/s/oauth-clients is recommended instead of an authkey'
+  oauth-client-id:
+    description: 'Your Tailscale OAuth Client ID.'
+    required: false
+  oauth-client-secret:
+    description: 'Your Tailscale OAuth Client Secret.'
+    required: false
+  tags:
+    description: 'Comma separated list of tags to be applied to nodes (OAuth client must have permission to apply these tags).'
+    required: false
+  version:
+    description: 'Tailscale version to use. Specify `latest` for the latest stable version.'
+    required: true
+  args:
+    description: 'Optional additional arguments to `tailscale up`.'
+    required: false
+    default: ''
+  tailscaled-args:
+    description: 'Optional additional arguments to `tailscaled`.'
+    required: false
+    default: ''
+  hostname:
+    description: 'Fixed hostname to use.'
+    required: false
+    default: ''
+  timeout:
+    description: 'Timeout for `tailscale up`.'
+    required: false
+    default: '2m'
+  retry:
+    description: 'Number of retry attempts for Tailscale connection.'
+    required: false
+    default: '5'
+  use-cache:
+    description: 'Enable caching of Tailscale binaries to speed up subsequent runs.'
+    required: false
+    default: 'true'
+  statedir:
+    description: 'Directory to store Tailscale state. If empty, uses in-memory storage.'
+    required: false
+    default: ''
+  sha256sum:
+    description: 'Expected SHA256 checksum of the Tailscale package. If not provided, it will be fetched automatically.'
+    required: false
+    default: ''
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+  post: 'dist/logout/index.js'
+
