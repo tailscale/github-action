@@ -12,7 +12,7 @@ This action is written in Typescript using official GitHub SDKs. It provides som
 - **Post-job logout**: Automatically runs `tailscale logout` when the job completes, ensuring clean disconnection
 
 ### ⚡ **Performance Optimizations**
-- **Native TypeScript implementation**: Compiled to single JavaScript files for faster startup, comparison tests show this action is **40% faster** than the official action on Linux
+- **Native TypeScript implementation**: Compiled to single JavaScript files for faster startup, comparison tests show this action is up to **40% faster** than the official action on Linux
 - **Smart status checking**: Calls the localAPI to determine when the connection is ready, reducing the need for sleeps within the action
 - **Modified Defaults**: The usage of more reliable status checking means the backoffs and retries can be tuned
 
