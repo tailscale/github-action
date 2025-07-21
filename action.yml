@@ -20,12 +20,16 @@ inputs:
   tags:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
+  download:
+    description: 'Whether to download the `tailscale` and `tailscaled` binaries.'
+    required: false
+    default: 'true'
   version:
-    description: 'Tailscale version to use. Specify `latest` to use the latest stable version.'
+    description: 'Tailscale version to use if downloading. Specify `latest` to use the latest stable version.'
     required: true
     default: '1.82.0'
   sha256sum:
-    description: 'Expected SHA256 checksum of the tarball.'
+    description: 'Expected SHA256 checksum of the tarball when downloading.'
     required: false
     default: ''
   args:
@@ -73,6 +77,7 @@ runs:
           exit 1
 
       - name: Set Resolved Version
+        if: ${{ inputs.download == 'true' }}
         shell: bash
         run: |
           VERSION=${{ inputs.version }}
@@ -84,7 +89,7 @@ runs:
           echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
           echo "Resolved Tailscale version: $RESOLVED_VERSION"
       - name: Set Tailscale Architecture - Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && inputs.download == 'true' }}
         shell: bash
         run: |
           if [ ${{ runner.arch }} = "ARM64" ]; then
@@ -99,7 +104,7 @@ runs:
           echo "TS_ARCH=$TS_ARCH" >> $GITHUB_ENV
 
       - name: Set Tailscale Architecture - Windows
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Windows' && inputs.download == 'true' }}
         shell: bash
         run: |
           if [ ${{ runner.arch }} = "ARM64" ]; then
@@ -112,7 +117,7 @@ runs:
           echo "TS_ARCH=$TS_ARCH" >> $GITHUB_ENV
 
       - name: Set SHA256 - Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && inputs.download == 'true' }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -130,7 +135,7 @@ runs:
           echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
           
       - name: Restore Tailscale Binary - Linux
-        if: ${{ inputs.use-cache == 'true' && runner.os == 'Linux' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'Linux' && inputs.download == 'true' }}
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: restore-cache-tailscale-linux
         with:
@@ -138,7 +143,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Linux
-        if: ${{ runner.os == 'Linux' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-linux.outputs.cache-hit != 'true') }}
+        if: ${{ runner.os == 'Linux' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-linux.outputs.cache-hit != 'true') && inputs.download == 'true' }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -154,7 +159,7 @@ runs:
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
 
       - name: Save Tailscale Binary - Linux
-        if: ${{ inputs.use-cache == 'true' && steps.restore-cache-tailscale-linux.outputs.cache-hit != 'true' && runner.os == 'Linux' }}
+        if: ${{ inputs.use-cache == 'true' && steps.restore-cache-tailscale-linux.outputs.cache-hit != 'true' && runner.os == 'Linux' && inputs.download == 'true' }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: save-cache-tailscale-linux
         with:
@@ -162,7 +167,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
       
       - name: Install Tailscale - Linux
-        if: ${{ runner.os == 'Linux' }}
+        if: ${{ runner.os == 'Linux' && inputs.download == 'true' }}
         shell: bash
         run: |
           tar -C /tmp -xzf tailscale.tgz
@@ -171,7 +176,7 @@ runs:
           sudo mv "${TSPATH}/tailscale" "${TSPATH}/tailscaled" /usr/bin
 
       - name: Set SHA256 - Windows
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Windows' && inputs.download == 'true' }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -189,7 +194,7 @@ runs:
           echo "SHA256SUM=$SHA256SUM" >> $GITHUB_ENV
 
       - name: Restore Tailscale Binary - Windows
-        if: ${{ inputs.use-cache == 'true' && runner.os == 'Windows' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'Windows' && inputs.download == 'true' }}
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: restore-cache-tailscale-windows
         with:
@@ -197,7 +202,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Download Tailscale - Windows
-        if: ${{ runner.os == 'Windows' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-windows.outputs.cache-hit != 'true') }}
+        if: ${{ runner.os == 'Windows' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-windows.outputs.cache-hit != 'true') && inputs.download == 'true' }}
         shell: bash
         run: |
           MINOR=$(echo "$RESOLVED_VERSION" | awk -F '.' {'print $2'})
@@ -213,7 +218,7 @@ runs:
           echo "$SHA256SUM  tailscale.msi" | sha256sum -c
 
       - name: Save Tailscale Binary - Windows
-        if: ${{ inputs.use-cache == 'true' && steps.restore-cache-tailscale-windows.outputs.cache-hit != 'true' && runner.os == 'Windows' }}
+        if: ${{ inputs.use-cache == 'true' && steps.restore-cache-tailscale-windows.outputs.cache-hit != 'true' && runner.os == 'Windows' && inputs.download == 'true' }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         id: save-cache-tailscale-windows
         with:
@@ -221,7 +226,7 @@ runs:
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ env.TS_ARCH }}-${{ env.SHA256SUM }}
 
       - name: Install Tailscale - Windows
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Windows' && inputs.download == 'true' }}
         shell: pwsh
         run: |
           Start-Process "C:\Windows\System32\msiexec.exe" -Wait -ArgumentList @('/quiet', '/l*v ${{ runner.temp }}/tailscale.log', '/i', 'tailscale.msi')
@@ -229,14 +234,14 @@ runs:
           Remove-Item tailscale.msi -Force;
       - name: Checkout Tailscale repo - macOS
         id: checkout-tailscale-macos
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && inputs.download == 'true' }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: tailscale/tailscale
           path: ${{ github.workspace }}/tailscale
           ref: v${{ env.RESOLVED_VERSION }}
       - name: Restore Tailscale - macOS
-        if: ${{ inputs.use-cache == 'true' && runner.os == 'macOS' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'macOS' && inputs.download == 'true' }}
         id: restore-cache-tailscale-macos
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
@@ -245,7 +250,7 @@ runs:
             /usr/local/bin/tailscaled
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ runner.arch }}-${{ steps.checkout-tailscale-macos.outputs.commit }}
       - name: Build Tailscale binaries - macOS
-        if: ${{ runner.os == 'macOS' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-macos.outputs.cache-hit != 'true') }}
+        if: ${{ runner.os == 'macOS' && (inputs.use-cache != 'true' || steps.restore-cache-tailscale-macos.outputs.cache-hit != 'true') && inputs.download == 'true' }}
         shell: bash
         run: |
           cd tailscale
@@ -254,12 +259,12 @@ runs:
           ./build_dist.sh ./cmd/tailscaled
           sudo mv tailscale tailscaled /usr/local/bin
       - name: Remove tailscale checkout - macOS
-        if: ${{ runner.os == 'macOS' }}
+        if: ${{ runner.os == 'macOS' && inputs.download == 'true' }}
         shell: bash
         run: |
           rm -Rf ${{ github.workspace }}/tailscale
       - name: Save Tailscale - macOS
-        if: ${{ inputs.use-cache == 'true' && runner.os == 'macOS' }}
+        if: ${{ inputs.use-cache == 'true' && runner.os == 'macOS' && inputs.download == 'true' }}
         id: save-cache-tailscale-macos
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
@@ -267,6 +272,26 @@ runs:
             /usr/local/bin/tailscale
             /usr/local/bin/tailscaled
           key: ${{ runner.os }}-tailscale-${{ env.RESOLVED_VERSION }}-${{ runner.arch }}-${{ steps.checkout-tailscale-macos.outputs.commit }}
+
+      - name: Link Tailscale binaries - Linux/MacOS
+        if: ${{ (runner.os == 'Linux' || runner.os == 'macOS') && inputs.download == 'false' }}
+        shell: bash
+        run: |
+          TAILSCALE_PATH=$(which tailscale)
+          TAILSCALED_PATH=$(which tailscaled)
+          if [[ ! -f /usr/bin/tailscale ]]; then
+            sudo -E ln -s -f ${TAILSCALE_PATH} /usr/bin/tailscale
+          fi
+          if [[ ! -f /usr/bin/tailscaled ]]; then
+            sudo -E ln -s -f ${TAILSCALED_PATH} /usr/bin/tailscaled
+          fi
+      - name: Link Tailscale binaries - Windows
+        if: ${{ runner.os == 'Windows' && inputs.download == 'false' }}
+        shell: bash
+        run: |
+          echo "not implemented"
+          exit 1
+
       - name: Install timeout - macOS
         if: ${{ runner.os == 'macOS' }}
         shell: bash
