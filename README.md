@@ -29,6 +29,19 @@ be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
 
+## Authenticate with GitHub's OIDC provider (alpha)
+
+The Tailscale GitHub action can use an OIDC token provided by GitHub to authenticate the workflow to your tailnet. This functionality is currently available as a private alpha. To join the alpha program, contact your account rep or email `sam@tailscale.com`.
+
+```yaml
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oidc-client-id: ${{ secrets.TS_OIDC_CLIENT_ID }}
+      oidc-aud-claim: ${{ secrets.TS_OIDC_AUD_CLAIM }}
+      tags: tag:ci
+```
+
 ## Tailnet Lock
 
 If you are using this Action in a [Tailnet
