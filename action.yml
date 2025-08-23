@@ -21,7 +21,7 @@ inputs:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
   version:
-    description: 'Tailscale version to use. Specify `latest` to use the latest stable version.'
+    description: 'Tailscale version to use. Specify `latest` to use the latest stable version, and `unstable` to use the latest development version.'
     required: true
     default: '1.82.0'
   sha256sum:
@@ -78,6 +78,8 @@ runs:
           VERSION=${{ inputs.version }}
           if [ "$VERSION" = "latest" ]; then
             RESOLVED_VERSION=$(curl -H user-agent:tailscale-github-action -s "https://pkgs.tailscale.com/stable/?mode=json" | jq -r .Version)
+          elif [ "$VERSION" = "unstable" ]; then
+            RESOLVED_VERSION=$(curl -H user-agent:tailscale-github-action -s "https://pkgs.tailscale.com/unstable/?mode=json" | jq -r .Version)
           else
             RESOLVED_VERSION=$VERSION
           fi
