@@ -322,3 +322,8 @@ runs:
             echo "Tailscale up failed. Retrying in $((i * 5)) seconds..."
             sleep $((i * 5))
           done
+          for ((i=1;i<=$RETRY;i++)); do
+            timeout --verbose --kill-after=1s ${TIMEOUT} ${MAYBE_SUDO} bash -c 'while tailscale dns query google.com. a | grep "failed to query DNS"; do sleep 1; done' && break
+            echo "Tailscale failed to resolve google.com.. Retrying in $((i * 5)) seconds..."
+            sleep $((i * 5))
+          done
