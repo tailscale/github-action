@@ -4,12 +4,12 @@ This GitHub Action connects to your [Tailscale network](https://tailscale.com)
 by adding a step to your workflow.
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v3
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
 ```
 
 Subsequent steps in the Action can then access nodes in your Tailnet.
@@ -29,6 +29,28 @@ be automatically removed by the coordination server a short time after they
 finish their run. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
 
+## Eventual consistency
+
+Propagating information about new peers - such as the node created by this action - across your tailnet
+is an eventually consistent process, and brief delays are expected. Until the GitHub workflow node 
+becomes visible, other peers will not accept connections. It is best to verify connectivity to the 
+intended nodes before executing steps that rely on them.
+
+You can do this by adding a list of targets to the action configuration:
+
+```yaml
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    targets: 100.x.y.z,my-machine.my-tailnet.ts.net
+```
+
+or with the [tailscale ping](https://tailscale.com/kb/1080/cli#ping) command if you do not know the targets at the time of installing Tailscale in the workflow:
+
+```bash
+tailscale ping my-target.my-tailnet.ts.net
+```
+
 ## Tailnet Lock
 
 If you are using this Action in a [Tailnet
@@ -42,11 +64,11 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
   client to store the Tailnet Key Authority data in.
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v3
-    with:
-      authkey: tskey-auth-...
-      statedir: /tmp/tailscale-state/
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    authkey: tskey-auth-...
+    statedir: /tmp/tailscale-state/
 ```
 
 ## Defining Tailscale version
@@ -54,25 +76,25 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
 Which Tailscale version to use can be set like this:
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v3
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: 1.52.0
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: 1.52.0
 ```
 
 If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v3
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: latest
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: latest
 ```
 
 You can find the latest Tailscale stable version number at
@@ -86,10 +108,10 @@ Caching can reduce download times and download failures on runners with slower n
 You can opt in to caching Tailscale binaries by passing `'true'` to the `use-cache` input:
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v3
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      use-cache: 'true'
+- name: Tailscale
+  uses: tailscale/github-action@v3
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    use-cache: 'true'
 ```

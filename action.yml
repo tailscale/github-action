@@ -56,6 +56,10 @@ inputs:
     description: 'Whether to cache the Tailscale binaries (Linux/macOS) or installer (Windows)'
     required: false
     default: 'false'
+  targets:
+    description: 'Comma separated list of targets (Tailscale IP addresses or machine names if MagicDNS is enabled on the tailnet) to `tailscale ping` for connectivity verification after `tailscale up` completes'
+    required: false
+    default: ''
 runs:
     using: 'composite'
     steps:
@@ -150,7 +154,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --retry 3 --retry-all-errors --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
@@ -209,7 +213,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --retry 3 --retry-all-errors --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.msi)"
           echo "$SHA256SUM  tailscale.msi" | sha256sum -c
@@ -353,3 +357,38 @@ runs:
             echo "Tailscale up failed. Retrying in $((i * 5)) seconds..."
             sleep $((i * 5))
           done
+      - name: Verify Target Connectivity
+        if: ${{ inputs.targets != '' }}
+        shell: bash
+        env:
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          IFS=',' read -ra TARGET_ARRAY <<< "$TARGETS"
+
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            MAYBE_SUDO="sudo -E"
+          fi
+
+          failed_targets=()
+          for target in "${TARGET_ARRAY[@]}"; do
+            target=$(echo "$target" | xargs)  # trim whitespace
+            if [ -n "$target" ]; then
+              output=$(${MAYBE_SUDO} tailscale ping --c=36 $target 2>&1)
+              exit_code=$?
+
+              if [ $exit_code -eq 0 ]; then
+                echo "Successfully reached $target"
+              elif echo "$output" | grep -q "direct connection not established"; then
+                echo "::warning title=Target Connectivity Warning::Failed to establish direct connection to $target, but connection may still work via DERP"
+              else
+                # Regular failure case
+                echo "Failed to reach $target"
+                failed_targets+=("$target")
+              fi
+            fi
+          done
+
+          if [ ${#failed_targets[@]} -gt 0 ]; then
+            echo "::error title=Target Connectivity Failed::Failed to reach the following targets: ${failed_targets[*]}"
+            exit 1
+          fi
