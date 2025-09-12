@@ -56,6 +56,10 @@ inputs:
     description: 'Whether to cache the Tailscale binaries (Linux/macOS) or installer (Windows)'
     required: false
     default: 'false'
+  targets:
+    description: 'Comma separated list of targets to ping for connectivity verification after connecting to Tailscale'
+    required: false
+    default: ''
 runs:
     using: 'composite'
     steps:
@@ -324,3 +328,30 @@ runs:
             echo "Tailscale up failed. Retrying in $((i * 5)) seconds..."
             sleep $((i * 5))
           done
+      - name: Verify Target Connectivity
+        if: ${{ inputs.targets != '' }}
+        shell: bash
+        env:
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          IFS=',' read -ra TARGET_ARRAY <<< "$TARGETS"
+          
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            MAYBE_SUDO="sudo -E"
+          fi
+          
+          failed_targets=()
+          for target in "${TARGET_ARRAY[@]}"; do
+            target=$(echo "$target" | xargs)  # trim whitespace
+            if [ -n "$target" ]; then
+              if ! ${MAYBE_SUDO} tailscale ping $target >/dev/null 2>&1; then
+                echo "Failed to reach $target"
+                failed_targets+=("$target")
+              fi
+            fi
+          done
+          
+          if [ ${#failed_targets[@]} -gt 0 ]; then
+            echo "::error title=Target Connectivity Failed::Failed to reach the following targets: ${failed_targets[*]}"
+            exit 1
+          fi
