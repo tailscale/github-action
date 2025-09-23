@@ -37,7 +37,7 @@ inputs:
     required: false
     default: ''
   hostname:
-    description: 'Fixed hostname to use.'
+    description: 'Fixed hostname to use. Must be a valid DNS label (alphanumeric and dashes only, 1-63 characters, cannot start or end with a dash). If not provided, a hostname will be generated based on the runner name.'
     required: false
     default: ''
   statedir:
@@ -301,13 +301,42 @@ runs:
           TIMEOUT: ${{ inputs.timeout }}
           RETRY: ${{ inputs.retry }}
         run: |
+          sanitize_hostname() {
+            local hostname="$1"
+            hostname=$(echo "$hostname" | sed 's/[^a-zA-Z0-9-]/-/g') # Replace invalid characters with dashes
+            hostname=$(echo "$hostname" | cut -c1-63) # Truncate to 63 characters maximum
+            hostname=$(echo "$hostname" | sed 's/^-*//;s/-*$//') # Remove leading/trailing dashes
+            echo "$hostname"
+          }
+
+          is_valid_dns_label() {
+            local hostname="$1"
+            if [ ${#hostname} -eq 0 ] || [ ${#hostname} -gt 63 ]; then # Check length (1-63 characters)
+              return 1
+            fi
+            if ! echo "$hostname" | grep -qE '^[a-zA-Z0-9-]+$'; then # Check for valid characters (alphanumeric and dashes only)
+              return 1
+            fi
+            if echo "$hostname" | grep -qE '^-|-$'; then # Check that it doesn't start or end with dash
+              return 1
+            fi
+            return 0
+          }
+
           if [ -z "${HOSTNAME}" ]; then
             if [ "${{ runner.os }}" == "Windows" ]; then
               HOSTNAME="github-$COMPUTERNAME"
-            else 
+            else
               HOSTNAME="github-$(hostname)"
             fi
+            HOSTNAME=$(sanitize_hostname "$HOSTNAME")
+          else
+            if ! is_valid_dns_label "$HOSTNAME"; then
+              echo "::error::HOSTNAME '$HOSTNAME' is not a valid DNS label. It should contain only alphanumeric characters and dashes, be 1-63 characters long, and not start or end with a dash."
+              exit 1
+            fi
           fi
+
           if [ -n "${{ inputs['oauth-secret'] }}" ]; then
             TAILSCALE_AUTHKEY="${{ inputs['oauth-secret'] }}?preauthorized=true&ephemeral=true"
             TAGS_ARG="--advertise-tags=${{ inputs.tags }}"
