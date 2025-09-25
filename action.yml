@@ -154,7 +154,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale_${RESOLVED_VERSION}_${TS_ARCH}.tgz"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --max-time 300 --retry 3 --retry-all-errors --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.tgz --http1.1 --max-time 300 --retry 3 --retry-all-errors --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.tgz)"
           echo "$SHA256SUM  tailscale.tgz" | sha256sum -c
@@ -213,7 +213,7 @@ runs:
             URL="https://pkgs.tailscale.com/unstable/tailscale-setup-${RESOLVED_VERSION}-${TS_ARCH}.msi"
           fi
           echo "Downloading $URL"
-          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --max-time 300 --retry 3 --retry-all-errors --fail
+          curl -H user-agent:tailscale-github-action -L "$URL" -o tailscale.msi --http1.1 --max-time 300 --retry 3 --retry-all-errors --fail
           echo "Expected sha256: $SHA256SUM"
           echo "Actual sha256: $(sha256sum tailscale.msi)"
           echo "$SHA256SUM  tailscale.msi" | sha256sum -c
@@ -373,15 +373,17 @@ runs:
           for target in "${TARGET_ARRAY[@]}"; do
             target=$(echo "$target" | xargs)  # trim whitespace
             if [ -n "$target" ]; then
-              output=$(${MAYBE_SUDO} tailscale ping --c=36 $target 2>&1)
+              # Disable -e temporarily so we can handle errors ourselves
+              set +e
+              output=$(${MAYBE_SUDO} tailscale ping --c=36 "$target" 2>&1)
               exit_code=$?
-
+              set -e
+              
               if [ $exit_code -eq 0 ]; then
                 echo "Successfully reached $target"
               elif echo "$output" | grep -q "direct connection not established"; then
                 echo "::warning title=Target Connectivity Warning::Failed to establish direct connection to $target but was able to connect via DERP"
               else
-                # Regular failure case
                 echo "Failed to reach $target"
                 failed_targets+=("$target")
               fi
