@@ -85,7 +85,7 @@ Which Tailscale version to use can be set like this:
     version: 1.52.0
 ```
 
-If you'd like to specify the latest version, simply set the version as `latest`
+`latest` or `unstable` can also be specified to use the latest stable or unstable version respectively:
 
 ```yaml
 - name: Tailscale
