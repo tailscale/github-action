@@ -379,7 +379,7 @@ runs:
               if [ $exit_code -eq 0 ]; then
                 echo "Successfully reached $target"
               elif echo "$output" | grep -q "direct connection not established"; then
-                echo "::warning title=Target Connectivity Warning::Failed to establish direct connection to $target, but connection may still work via DERP"
+                echo "::warning title=Target Connectivity Warning::Failed to establish direct connection to $target but was able to connect via DERP"
               else
                 # Regular failure case
                 echo "Failed to reach $target"
