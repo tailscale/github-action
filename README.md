@@ -20,7 +20,6 @@ This action is written in Typescript using official GitHub SDKs. It provides som
 - **Native Support for All GitHub supported OSS**: Supports Linux, Windows, and macOS runners and all architectures
 - **Native crypto verification**: Uses Node.js crypto module instead of external tools for SHA256 verification
 - **Improved Windows handling**: Better MSI installation and authentication timing
-- **macOS via Homebrew**: Simple and reliable installation using `brew install tailscale`
 - **Consistent caching**: Caching built using the TypeScript SDKs meaning more flexibility.
 
 ## Usage
@@ -207,3 +206,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 This action automatically logs out of Tailscale when the job completes, ensuring no persistent connections remain. For OAuth authentication, connections are ephemeral by default.
 
 For security issues, please see our [security policy](SECURITY.md).
+
+## CI Notes
+
+CI tests run against the tailscalegithubactionbot.github tailnet. Check our usual credential store for credentials.
