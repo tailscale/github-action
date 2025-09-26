@@ -36,7 +36,7 @@ async function getTailscaleStatus(): Promise<any> {
     const { stdout } = await exec.getExecOutput('tailscale', ['status', '--json']);
     return JSON.parse(stdout);
   } else if (platform === 'darwin') {
-    // macOS with Homebrew: use /var/run/tailscaled.socket
+    // macOS: use /var/run/tailscaled.socket
     return new Promise((resolve, reject) => {
       const options: http.RequestOptions = {
         socketPath: '/var/run/tailscaled.socket',
@@ -228,7 +228,7 @@ async function installTailscale(config: TailscaleConfig, runnerOS: string): Prom
       if (runnerOS === 'Windows') {
         await installTailscaleWindows(config, toolPath, true);
       } else {
-        // For Linux/macOS, copy binaries to /usr/bin
+        // For Linux/macOS, copy binaries to /usr/local/bin
         await installCachedBinaries(toolPath, runnerOS);
       }
       return;
@@ -312,16 +312,16 @@ async function installTailscaleLinux(config: TailscaleConfig, toolPath: string):
   fs.copyFileSync(path.join(extractedDir, 'tailscale'), path.join(toolPath, 'tailscale'));
   fs.copyFileSync(path.join(extractedDir, 'tailscaled'), path.join(toolPath, 'tailscaled'));
 
-  // Install binaries to /usr/bin
+  // Install binaries to /usr/local/bin
   await exec.exec('sudo', ['cp',
     path.join(toolPath, 'tailscale'),
     path.join(toolPath, 'tailscaled'),
-    '/usr/bin'
+    '/usr/local/bin'
   ]);
 
   // Make sure they're executable
-  await exec.exec('sudo', ['chmod', '+x', '/usr/bin/tailscale']);
-  await exec.exec('sudo', ['chmod', '+x', '/usr/bin/tailscaled']);
+  await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
+  await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
 }
 
 async function installTailscaleWindows(config: TailscaleConfig, toolPath: string, fromCache: boolean = false): Promise<void> {
@@ -386,96 +386,76 @@ async function installTailscaleWindows(config: TailscaleConfig, toolPath: string
 }
 
 async function installTailscaleMacOS(config: TailscaleConfig, toolPath: string): Promise<void> {
-  // macOS: Install via Homebrew
-  core.info('Installing Tailscale via Homebrew on macOS...');
+  core.info('Building tailscale from src on macOS...');
   
-  try {
-    // Check if Homebrew is installed
-    await exec.exec('brew', ['--version'], { silent: true });
-  } catch (error) {
-    throw new Error('Homebrew is required to install Tailscale on macOS. Please ensure Homebrew is installed.');
+  // Clone the repo
+  await exec.exec('git clone https://github.com/tailscale/tailscale.git tailscale');
+  
+  // Checkout the resolved version
+  await exec.exec(`git checkout v${config.resolvedVersion}`, [], {
+    cwd: 'tailscale',
+  })
+
+  // Create tool directory and copy binaries there for caching
+  fs.mkdirSync(toolPath, { recursive: true });
+  
+  // Build tailscale and tailscaled into tool directory
+  for (const binary of ['tailscale', 'tailscaled']) {
+    await exec.exec(`./build_dist.sh -o ${path.join(toolPath, binary)} ./cmd/${binary}`, [], {
+      cwd: 'tailscale',
+      env: {
+        ...process.env,
+        'TS_USE_TOOLCHAIN': '1',
+      }
+    })
   }
   
-  // Install Tailscale via Homebrew
-  core.info('Installing Tailscale from Homebrew...');
-  await exec.exec('brew', ['install', 'tailscale']);
-  
-  core.info('✅ Tailscale installed successfully on macOS via Homebrew');
+  // Install binaries to /usr/local/bin
+  await exec.exec('sudo', ['cp',
+    path.join(toolPath, 'tailscale'),
+    path.join(toolPath, 'tailscaled'),
+    '/usr/local/bin'
+  ]);
+
+  // Make sure they're executable
+  await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
+  await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
+
+  core.info('✅ Tailscale installed successfully on macOS from source');
 }
 
 async function startTailscaleDaemon(config: TailscaleConfig): Promise<void> {
   const runnerOS = process.env.RUNNER_OS || '';
   
-  // macOS with Homebrew installation
-  if (runnerOS === 'macOS') {
-    core.info('Starting Tailscale daemon on macOS...');
-    try {
-      // Start tailscaled using sudo (Homebrew installs to /usr/local/bin or /opt/homebrew/bin)
-      await exec.exec('sudo', ['tailscaled', 'install-system-daemon']);
-      core.info('✅ Tailscale system daemon installed');
-      
-      // Start the system daemon
-      await exec.exec('sudo', ['launchctl', 'start', 'com.tailscale.tailscaled']);
-      core.info('✅ Tailscale system daemon started');
-    } catch (error) {
-      core.warning(`Failed to install system daemon: ${error}`);
-      core.info('Trying manual daemon start...');
-      
-      // Fall back to manual start
-      const stateArgs = config.stateDir ? 
-        [`--statedir=${config.stateDir}`] : 
-        ['--state=mem:'];
+  // Manual daemon start
+  const stateArgs = config.stateDir ? 
+    [`--statedir=${config.stateDir}`] : 
+    ['--state=mem:'];
 
-      if (config.stateDir) {
-        fs.mkdirSync(config.stateDir, { recursive: true });
-      }
-
-      const args = [
-        ...stateArgs,
-        ...config.tailscaledArgs.split(' ').filter(Boolean)
-      ];
-
-      const daemon = spawn('sudo', ['-E', 'tailscaled', ...args], {
-        detached: true,
-        stdio: ['ignore', 'ignore', fs.openSync(path.join(os.homedir(), 'tailscaled.log'), 'w')]
-      });
-      
-      daemon.unref();
-      if (daemon.stdin) daemon.stdin.end();
-      if (daemon.stdout) daemon.stdout.destroy();
-      if (daemon.stderr) daemon.stderr.destroy();
-    }
-  } else {
-    // Linux - manual daemon start
-    const stateArgs = config.stateDir ? 
-      [`--statedir=${config.stateDir}`] : 
-      ['--state=mem:'];
-
-    if (config.stateDir) {
-      fs.mkdirSync(config.stateDir, { recursive: true });
-    }
-
-    const args = [
-      ...stateArgs,
-      ...config.tailscaledArgs.split(' ').filter(Boolean)
-    ];
-
-    core.info('Starting tailscaled daemon...');
-    
-    // Start daemon in background
-    const daemon = spawn('sudo', ['-E', 'tailscaled', ...args], {
-      detached: true,
-      stdio: ['ignore', 'ignore', fs.openSync(path.join(os.homedir(), 'tailscaled.log'), 'w')]
-    });
-    
-    daemon.unref(); // Ensure daemon doesn't keep Node.js process alive
-    
-    // Close stdin/stdout/stderr to fully detach
-    if (daemon.stdin) daemon.stdin.end();
-    if (daemon.stdout) daemon.stdout.destroy();
-    if (daemon.stderr) daemon.stderr.destroy();
+  if (config.stateDir) {
+    fs.mkdirSync(config.stateDir, { recursive: true });
   }
 
+  const args = [
+    ...stateArgs,
+    ...config.tailscaledArgs.split(' ').filter(Boolean)
+  ];
+
+  core.info('Starting tailscaled daemon...');
+  
+  // Start daemon in background
+  const daemon = spawn('sudo', ['-E', 'tailscaled', ...args], {
+    detached: true,
+    stdio: ['ignore', 'ignore', fs.openSync(path.join(os.homedir(), 'tailscaled.log'), 'w')]
+  });
+  
+  daemon.unref(); // Ensure daemon doesn't keep Node.js process alive
+  
+  // Close stdin/stdout/stderr to fully detach
+  if (daemon.stdin) daemon.stdin.end();
+  if (daemon.stdout) daemon.stdout.destroy();
+  if (daemon.stderr) daemon.stderr.destroy();
+  
   // Poll the local API until daemon is responsive
   await waitForDaemonReady();
   
@@ -519,6 +499,9 @@ async function connectToTailscale(config: TailscaleConfig, runnerOS: string): Pr
       hostname = `github-${stdout.trim()}`;
     }
   }
+
+  // Limit hostname to 63 characters (more will result in the error "not a valid DNS label")
+  hostname = hostname.substring(0, 63);
 
   // Prepare auth and tags
   let finalAuthKey = config.authKey;
@@ -631,15 +614,15 @@ function getToolPath(config: TailscaleConfig, runnerOS: string): string {
 
 async function installCachedBinaries(toolPath: string, runnerOS: string): Promise<void> {
   if (runnerOS === 'Linux' || runnerOS === 'macOS') {
-    // Copy cached binaries to /usr/bin
+    // Copy cached binaries to /usr/local/bin
     const tailscaleBin = path.join(toolPath, 'tailscale');
     const tailscaledBin = path.join(toolPath, 'tailscaled');
 
     if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
-      await exec.exec('sudo', ['cp', tailscaleBin, '/usr/bin/tailscale']);
-      await exec.exec('sudo', ['cp', tailscaledBin, '/usr/bin/tailscaled']);
-      await exec.exec('sudo', ['chmod', '+x', '/usr/bin/tailscale']);
-      await exec.exec('sudo', ['chmod', '+x', '/usr/bin/tailscaled']);
+      await exec.exec('sudo', ['cp', tailscaleBin, '/usr/local/bin/tailscale']);
+      await exec.exec('sudo', ['cp', tailscaledBin, '/usr/local/bin/tailscaled']);
+      await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
+      await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
     } else {
       throw new Error(`Cached binaries not found in ${toolPath}`);
     }

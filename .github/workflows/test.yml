@@ -8,32 +8,10 @@ on:
       - main
 
 jobs:
-  # Test building the action
-  build:
-    name: Build Action
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install Dependencies
-        run: npm ci
-      
-      - name: Build Action
-        run: npm run build
-      
-
   # Matrix test for all supported platforms and architectures
   
   integration-tests:
     name: Test ${{ matrix.os }} (${{ matrix.arch }})
-    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -74,17 +52,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Build Action
+        run: npm run build
+      
       # Test with OAuth authentication
       - name: Test Tailscale Setup (OAuth)
         id: tailscale-oauth
         uses: ./
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          oauth-client-id: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
           tags: "tag:ci"
           version: "1.82.0"
-          use-cache: true
-          timeout: "3m"
+          use-cache: false
+          timeout: "5m"
           retry: 3
       
       # Test Tailscale status command
@@ -103,12 +93,3 @@ jobs:
           fi
         shell: bash
       
-
-
-
-      
-
-
-
-      
-  
