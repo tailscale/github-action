@@ -41113,37 +41113,40 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
 const exec = __importStar(__nccwpck_require__(95236));
 const tc = __importStar(__nccwpck_require__(33472));
-const cache = __importStar(__nccwpck_require__(5116));
-const fs = __importStar(__nccwpck_require__(79896));
-const path = __importStar(__nccwpck_require__(16928));
-const os = __importStar(__nccwpck_require__(70857));
 const child_process_1 = __nccwpck_require__(35317);
 const crypto = __importStar(__nccwpck_require__(76982));
+const fs = __importStar(__nccwpck_require__(79896));
 const http = __importStar(__nccwpck_require__(58611));
+const os = __importStar(__nccwpck_require__(70857));
+const path = __importStar(__nccwpck_require__(16928));
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus() {
     const platform = os.platform();
-    if (platform === 'win32') {
+    if (platform === "win32") {
         // Windows: use tailscale status command
-        const { stdout } = await exec.getExecOutput('tailscale', ['status', '--json']);
+        const { stdout } = await exec.getExecOutput("tailscale", [
+            "status",
+            "--json",
+        ]);
         return JSON.parse(stdout);
     }
-    else if (platform === 'darwin') {
+    else if (platform === "darwin") {
         // macOS: use /var/run/tailscaled.socket
         return new Promise((resolve, reject) => {
             const options = {
-                socketPath: '/var/run/tailscaled.socket',
-                path: '/localapi/v0/status',
-                method: 'GET',
-                headers: { Host: 'local-tailscaled.sock' },
+                socketPath: "/var/run/tailscaled.socket",
+                path: "/localapi/v0/status",
+                method: "GET",
+                headers: { Host: "local-tailscaled.sock" },
             };
             const req = http.request(options, (res) => {
-                let data = '';
-                res.on('data', (chunk) => (data += chunk));
-                res.on('end', () => {
+                let data = "";
+                res.on("data", (chunk) => (data += chunk));
+                res.on("end", () => {
                     try {
                         resolve(JSON.parse(data));
                     }
@@ -41155,9 +41158,9 @@ async function getTailscaleStatus() {
             // Set timeout to prevent hanging
             req.setTimeout(5000, () => {
                 req.destroy();
-                reject(new Error('Request timeout'));
+                reject(new Error("Request timeout"));
             });
-            req.on('error', reject);
+            req.on("error", reject);
             req.end();
         });
     }
@@ -41165,15 +41168,15 @@ async function getTailscaleStatus() {
         // Linux: use Unix socket
         return new Promise((resolve, reject) => {
             const options = {
-                socketPath: '/run/tailscale/tailscaled.sock',
-                path: '/localapi/v0/status',
-                method: 'GET',
-                headers: { Host: 'local-tailscaled.sock' },
+                socketPath: "/run/tailscale/tailscaled.sock",
+                path: "/localapi/v0/status",
+                method: "GET",
+                headers: { Host: "local-tailscaled.sock" },
             };
             const req = http.request(options, (res) => {
-                let data = '';
-                res.on('data', (chunk) => (data += chunk));
-                res.on('end', () => {
+                let data = "";
+                res.on("data", (chunk) => (data += chunk));
+                res.on("end", () => {
                     try {
                         resolve(JSON.parse(data));
                     }
@@ -41185,9 +41188,9 @@ async function getTailscaleStatus() {
             // Set timeout to prevent hanging
             req.setTimeout(5000, () => {
                 req.destroy();
-                reject(new Error('Request timeout'));
+                reject(new Error("Request timeout"));
             });
-            req.on('error', reject);
+            req.on("error", reject);
             req.end();
         });
     }
@@ -41195,9 +41198,9 @@ async function getTailscaleStatus() {
 async function run() {
     try {
         // Validate runner OS
-        const runnerOS = process.env.RUNNER_OS || '';
-        if (!['Linux', 'Windows', 'macOS'].includes(runnerOS)) {
-            throw new Error('Support Linux, Windows, and macOS Only');
+        const runnerOS = process.env.RUNNER_OS || "";
+        if (!["Linux", "Windows", "macOS"].includes(runnerOS)) {
+            throw new Error("Support Linux, Windows, and macOS Only");
         }
         // Get and validate inputs
         const config = await getInputs();
@@ -41211,7 +41214,7 @@ async function run() {
         // Install Tailscale
         await installTailscale(config, runnerOS);
         // Start daemon (non-Windows only)
-        if (runnerOS !== 'Windows') {
+        if (runnerOS !== "Windows") {
             await startTailscaleDaemon(config);
         }
         // Connect to Tailscale
@@ -41220,8 +41223,8 @@ async function run() {
         try {
             const status = await getTailscaleStatus();
             core.debug(`Tailscale status: ${JSON.stringify(status)}`);
-            if (status.BackendState === 'Running') {
-                core.info('✅ Tailscale is running and connected!');
+            if (status.BackendState === "Running") {
+                core.info("✅ Tailscale is running and connected!");
                 // Explicitly exit to prevent hanging
                 process.exit(0);
             }
@@ -41233,7 +41236,7 @@ async function run() {
         catch (err) {
             core.warning(`Failed to get Tailscale status: ${err}`);
             // Still exit successfully since the main connection worked
-            core.info('✅ Tailscale connection completed successfully!');
+            core.info("✅ Tailscale connection completed successfully!");
             process.exit(0);
         }
     }
@@ -41243,34 +41246,35 @@ async function run() {
 }
 async function getInputs() {
     return {
-        version: core.getInput('version') || '1.82.0',
-        resolvedVersion: '',
-        arch: '',
-        authKey: core.getInput('authkey') || '',
-        oauthClientId: core.getInput('oauth-client-id') || '',
-        oauthSecret: core.getInput('oauth-client-secret') || '',
-        tags: core.getInput('tags') || '',
-        hostname: core.getInput('hostname') || '',
-        args: core.getInput('args') || '',
-        tailscaledArgs: core.getInput('tailscaled-args') || '',
-        stateDir: core.getInput('statedir') || '',
-        timeout: core.getInput('timeout') || '60s', // Reduced from 2m to 60s
-        retry: parseInt(core.getInput('retry') || '5'),
-        useCache: core.getBooleanInput('use-cache'),
-        sha256Sum: core.getInput('sha256sum') || ''
+        version: core.getInput("version") || "1.82.0",
+        resolvedVersion: "",
+        arch: "",
+        authKey: core.getInput("authkey") || "",
+        oauthClientId: core.getInput("oauth-client-id") || "",
+        oauthSecret: core.getInput("oauth-client-secret") || "",
+        tags: core.getInput("tags") || "",
+        hostname: core.getInput("hostname") || "",
+        args: core.getInput("args") || "",
+        tailscaledArgs: core.getInput("tailscaled-args") || "",
+        stateDir: core.getInput("statedir") || "",
+        timeout: core.getInput("timeout") || "60s", // Reduced from 2m to 60s
+        retry: parseInt(core.getInput("retry") || "5"),
+        useCache: core.getBooleanInput("use-cache"),
+        sha256Sum: core.getInput("sha256sum") || "",
     };
 }
 function validateAuth(config) {
     if (!config.authKey && (!config.oauthSecret || !config.tags)) {
-        throw new Error('OAuth identity empty, please provide either an auth key or OAuth secret and tags.');
+        throw new Error("OAuth identity empty, please provide either an auth key or OAuth secret and tags.");
     }
 }
 async function resolveVersion(version) {
-    if (version === 'latest') {
-        const { stdout } = await exec.getExecOutput('curl', [
-            '-H', 'user-agent:action-setup-tailscale',
-            '-s',
-            'https://pkgs.tailscale.com/stable/?mode=json'
+    if (version === "latest") {
+        const { stdout } = await exec.getExecOutput("curl", [
+            "-H",
+            "user-agent:action-setup-tailscale",
+            "-s",
+            "https://pkgs.tailscale.com/stable/?mode=json",
         ]);
         const response = JSON.parse(stdout);
         return response.Version;
@@ -41278,23 +41282,30 @@ async function resolveVersion(version) {
     return version;
 }
 function getTailscaleArch(runnerOS) {
-    const runnerArch = process.env.RUNNER_ARCH || '';
-    if (runnerOS === 'Linux') {
+    const runnerArch = process.env.RUNNER_ARCH || "";
+    if (runnerOS === "Linux") {
         switch (runnerArch) {
-            case 'ARM64': return 'arm64';
-            case 'ARM': return 'arm';
-            case 'X86': return '386';
-            default: return 'amd64';
+            case "ARM64":
+                return "arm64";
+            case "ARM":
+                return "arm";
+            case "X86":
+                return "386";
+            default:
+                return "amd64";
         }
     }
-    else if (runnerOS === 'Windows') {
+    else if (runnerOS === "Windows") {
         switch (runnerArch) {
-            case 'ARM64': return 'arm64';
-            case 'X86': return 'x86';
-            default: return 'amd64';
+            case "ARM64":
+                return "arm64";
+            case "X86":
+                return "x86";
+            default:
+                return "amd64";
         }
     }
-    return 'amd64';
+    return "amd64";
 }
 async function installTailscale(config, runnerOS) {
     const cacheKey = generateCacheKey(config, runnerOS);
@@ -41305,7 +41316,7 @@ async function installTailscale(config, runnerOS) {
         if (cacheHit) {
             core.info(`Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
             // For Windows, install the cached MSI
-            if (runnerOS === 'Windows') {
+            if (runnerOS === "Windows") {
                 await installTailscaleWindows(config, toolPath, true);
             }
             else {
@@ -41316,13 +41327,13 @@ async function installTailscale(config, runnerOS) {
         }
     }
     // Install fresh if not cached
-    if (runnerOS === 'Linux') {
+    if (runnerOS === "Linux") {
         await installTailscaleLinux(config, toolPath);
     }
-    else if (runnerOS === 'Windows') {
+    else if (runnerOS === "Windows") {
         await installTailscaleWindows(config, toolPath);
     }
-    else if (runnerOS === 'macOS') {
+    else if (runnerOS === "macOS") {
         await installTailscaleMacOS(config, toolPath);
     }
     // Save to cache after installation
@@ -41347,60 +41358,66 @@ async function installTailscale(config, runnerOS) {
 }
 async function calculateFileSha256(filePath) {
     return new Promise((resolve, reject) => {
-        const hash = crypto.createHash('sha256');
+        const hash = crypto.createHash("sha256");
         const stream = fs.createReadStream(filePath);
-        stream.on('error', err => reject(err));
-        stream.on('data', chunk => hash.update(chunk));
-        stream.on('end', () => resolve(hash.digest('hex').toLowerCase()));
+        stream.on("error", (err) => reject(err));
+        stream.on("data", (chunk) => hash.update(chunk));
+        stream.on("end", () => resolve(hash.digest("hex").toLowerCase()));
     });
 }
 async function installTailscaleLinux(config, toolPath) {
     // Determine if stable or unstable
-    const minor = parseInt(config.resolvedVersion.split('.')[1]);
+    const minor = parseInt(config.resolvedVersion.split(".")[1]);
     const isStable = minor % 2 === 0;
-    const baseUrl = isStable ? 'https://pkgs.tailscale.com/stable' : 'https://pkgs.tailscale.com/unstable';
+    const baseUrl = isStable
+        ? "https://pkgs.tailscale.com/stable"
+        : "https://pkgs.tailscale.com/unstable";
     // Get SHA256 if not provided
     if (!config.sha256Sum) {
         const shaUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz.sha256`;
-        const { stdout } = await exec.getExecOutput('curl', [
-            '-H', 'user-agent:action-setup-tailscale',
-            '-L', shaUrl, '--fail'
+        const { stdout } = await exec.getExecOutput("curl", [
+            "-H",
+            "user-agent:action-setup-tailscale",
+            "-L",
+            shaUrl,
+            "--fail",
         ]);
         config.sha256Sum = stdout.trim();
     }
     // Download and extract
     const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
     core.info(`Downloading ${downloadUrl}`);
-    const tarPath = await tc.downloadTool(downloadUrl, 'tailscale.tgz');
+    const tarPath = await tc.downloadTool(downloadUrl, "tailscale.tgz");
     // Verify checksum
     const actualSha = await calculateFileSha256(tarPath);
     const expectedSha = config.sha256Sum.trim().toLowerCase();
     core.info(`Expected sha256: ${expectedSha}`);
     core.info(`Actual sha256: ${actualSha}`);
     if (actualSha !== expectedSha) {
-        throw new Error('SHA256 checksum mismatch');
+        throw new Error("SHA256 checksum mismatch");
     }
     // Extract to tool path
-    const extractedPath = await tc.extractTar(tarPath, undefined, 'xz');
+    const extractedPath = await tc.extractTar(tarPath, undefined, "xz");
     const extractedDir = path.join(extractedPath, `tailscale_${config.resolvedVersion}_${config.arch}`);
     // Create tool directory and copy binaries there for caching
     fs.mkdirSync(toolPath, { recursive: true });
-    fs.copyFileSync(path.join(extractedDir, 'tailscale'), path.join(toolPath, 'tailscale'));
-    fs.copyFileSync(path.join(extractedDir, 'tailscaled'), path.join(toolPath, 'tailscaled'));
+    fs.copyFileSync(path.join(extractedDir, "tailscale"), path.join(toolPath, "tailscale"));
+    fs.copyFileSync(path.join(extractedDir, "tailscaled"), path.join(toolPath, "tailscaled"));
     // Install binaries to /usr/local/bin
-    await exec.exec('sudo', ['cp',
-        path.join(toolPath, 'tailscale'),
-        path.join(toolPath, 'tailscaled'),
-        '/usr/local/bin'
+    await exec.exec("sudo", [
+        "cp",
+        path.join(toolPath, "tailscale"),
+        path.join(toolPath, "tailscaled"),
+        "/usr/local/bin",
     ]);
     // Make sure they're executable
-    await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
-    await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
+    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
+    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
 }
 async function installTailscaleWindows(config, toolPath, fromCache = false) {
     // Create tool directory
     fs.mkdirSync(toolPath, { recursive: true });
-    const msiPath = path.join(toolPath, 'tailscale.msi');
+    const msiPath = path.join(toolPath, "tailscale.msi");
     if (fromCache) {
         // Installing from cached MSI
         if (!fs.existsSync(msiPath)) {
@@ -41411,15 +41428,20 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
     else {
         // Fresh download
         // Determine if stable or unstable
-        const minor = parseInt(config.resolvedVersion.split('.')[1]);
+        const minor = parseInt(config.resolvedVersion.split(".")[1]);
         const isStable = minor % 2 === 0;
-        const baseUrl = isStable ? 'https://pkgs.tailscale.com/stable' : 'https://pkgs.tailscale.com/unstable';
+        const baseUrl = isStable
+            ? "https://pkgs.tailscale.com/stable"
+            : "https://pkgs.tailscale.com/unstable";
         // Get SHA256 if not provided
         if (!config.sha256Sum) {
             const shaUrl = `${baseUrl}/tailscale-setup-${config.resolvedVersion}-${config.arch}.msi.sha256`;
-            const { stdout } = await exec.getExecOutput('curl', [
-                '-H', 'user-agent:action-setup-tailscale',
-                '-L', shaUrl, '--fail'
+            const { stdout } = await exec.getExecOutput("curl", [
+                "-H",
+                "user-agent:action-setup-tailscale",
+                "-L",
+                shaUrl,
+                "--fail",
             ]);
             config.sha256Sum = stdout.trim();
         }
@@ -41433,7 +41455,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         core.info(`Expected sha256: ${expectedSha}`);
         core.info(`Actual sha256: ${actualSha}`);
         if (actualSha !== expectedSha) {
-            throw new Error('SHA256 checksum mismatch');
+            throw new Error("SHA256 checksum mismatch");
         }
         // Keep the MSI file in toolPath for caching (don't delete it)
         // The downloadedMsiPath is in temp, but we want to keep it in toolPath
@@ -41442,63 +41464,70 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         }
     }
     // Install MSI (same for both fresh and cached)
-    await exec.exec('msiexec.exe', [
-        '/quiet',
-        `/l*v`, path.join(process.env.RUNNER_TEMP || '', 'tailscale.log'),
-        '/i', msiPath
+    await exec.exec("msiexec.exe", [
+        "/quiet",
+        `/l*v`,
+        path.join(process.env.RUNNER_TEMP || "", "tailscale.log"),
+        "/i",
+        msiPath,
     ]);
     // Add to PATH
-    core.addPath('C:\\Program Files\\Tailscale\\');
+    core.addPath("C:\\Program Files\\Tailscale\\");
 }
 async function installTailscaleMacOS(config, toolPath) {
-    core.info('Building tailscale from src on macOS...');
+    core.info("Building tailscale from src on macOS...");
     // Clone the repo
-    await exec.exec('git clone https://github.com/tailscale/tailscale.git tailscale');
+    await exec.exec("git clone https://github.com/tailscale/tailscale.git tailscale");
     // Checkout the resolved version
     await exec.exec(`git checkout v${config.resolvedVersion}`, [], {
-        cwd: 'tailscale',
+        cwd: "tailscale",
     });
     // Create tool directory and copy binaries there for caching
     fs.mkdirSync(toolPath, { recursive: true });
     // Build tailscale and tailscaled into tool directory
-    for (const binary of ['tailscale', 'tailscaled']) {
+    for (const binary of ["tailscale", "tailscaled"]) {
         await exec.exec(`./build_dist.sh -o ${path.join(toolPath, binary)} ./cmd/${binary}`, [], {
-            cwd: 'tailscale',
+            cwd: "tailscale",
             env: {
                 ...process.env,
-                'TS_USE_TOOLCHAIN': '1',
-            }
+                TS_USE_TOOLCHAIN: "1",
+            },
         });
     }
     // Install binaries to /usr/local/bin
-    await exec.exec('sudo', ['cp',
-        path.join(toolPath, 'tailscale'),
-        path.join(toolPath, 'tailscaled'),
-        '/usr/local/bin'
+    await exec.exec("sudo", [
+        "cp",
+        path.join(toolPath, "tailscale"),
+        path.join(toolPath, "tailscaled"),
+        "/usr/local/bin",
     ]);
     // Make sure they're executable
-    await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
-    await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
-    core.info('✅ Tailscale installed successfully on macOS from source');
+    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
+    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
+    core.info("✅ Tailscale installed successfully on macOS from source");
 }
 async function startTailscaleDaemon(config) {
-    const runnerOS = process.env.RUNNER_OS || '';
+    const runnerOS = process.env.RUNNER_OS || "";
     // Manual daemon start
-    const stateArgs = config.stateDir ?
-        [`--statedir=${config.stateDir}`] :
-        ['--state=mem:'];
+    const stateArgs = config.stateDir
+        ? [`--statedir=${config.stateDir}`]
+        : ["--state=mem:"];
     if (config.stateDir) {
         fs.mkdirSync(config.stateDir, { recursive: true });
     }
     const args = [
         ...stateArgs,
-        ...config.tailscaledArgs.split(' ').filter(Boolean)
+        ...config.tailscaledArgs.split(" ").filter(Boolean),
     ];
-    core.info('Starting tailscaled daemon...');
+    core.info("Starting tailscaled daemon...");
     // Start daemon in background
-    const daemon = (0, child_process_1.spawn)('sudo', ['-E', 'tailscaled', ...args], {
+    const daemon = (0, child_process_1.spawn)("sudo", ["-E", "tailscaled", ...args], {
         detached: true,
-        stdio: ['ignore', 'ignore', fs.openSync(path.join(os.homedir(), 'tailscaled.log'), 'w')]
+        stdio: [
+            "ignore",
+            "ignore",
+            fs.openSync(path.join(os.homedir(), "tailscaled.log"), "w"),
+        ],
     });
     daemon.unref(); // Ensure daemon doesn't keep Node.js process alive
     // Close stdin/stdout/stderr to fully detach
@@ -41510,19 +41539,19 @@ async function startTailscaleDaemon(config) {
         daemon.stderr.destroy();
     // Poll the local API until daemon is responsive
     await waitForDaemonReady();
-    core.info('✅ tailscaled daemon is up and running!');
+    core.info("✅ tailscaled daemon is up and running!");
 }
 async function waitForDaemonReady() {
     const maxWaitMs = 15000; // 15 seconds
     const pollIntervalMs = 500;
     let waited = 0;
-    core.info('Waiting for tailscaled daemon to become ready...');
+    core.info("Waiting for tailscaled daemon to become ready...");
     while (waited < maxWaitMs) {
         try {
             const status = await getTailscaleStatus();
             // If we get any valid response from the API, the daemon is ready
             if (status) {
-                core.info(`Daemon ready! Initial state: ${status.BackendState || 'Unknown'}`);
+                core.info(`Daemon ready! Initial state: ${status.BackendState || "Unknown"}`);
                 return;
             }
         }
@@ -41533,17 +41562,17 @@ async function waitForDaemonReady() {
         await sleep(pollIntervalMs);
         waited += pollIntervalMs;
     }
-    throw new Error('tailscaled daemon did not become ready within timeout');
+    throw new Error("tailscaled daemon did not become ready within timeout");
 }
 async function connectToTailscale(config, runnerOS) {
     // Determine hostname
     let hostname = config.hostname;
     if (!hostname) {
-        if (runnerOS === 'Windows') {
+        if (runnerOS === "Windows") {
             hostname = `github-${process.env.COMPUTERNAME}`;
         }
         else {
-            const { stdout } = await exec.getExecOutput('hostname');
+            const { stdout } = await exec.getExecOutput("hostname");
             hostname = `github-${stdout.trim()}`;
         }
     }
@@ -41560,36 +41589,36 @@ async function connectToTailscale(config, runnerOS) {
     }
     // Platform-specific args
     const platformArgs = [];
-    if (runnerOS === 'Windows') {
-        platformArgs.push('--unattended');
+    if (runnerOS === "Windows") {
+        platformArgs.push("--unattended");
     }
     // Build command
     const upArgs = [
-        'up',
+        "up",
         ...tagsArg,
         `--authkey=${finalAuthKey}`,
         `--hostname=${hostname}`,
-        '--accept-routes',
+        "--accept-routes",
         ...platformArgs,
-        ...config.args.split(' ').filter(Boolean)
+        ...config.args.split(" ").filter(Boolean),
     ];
     // Retry logic
     for (let attempt = 1; attempt <= config.retry; attempt++) {
         try {
             core.info(`Attempt ${attempt} to bring up Tailscale...`);
             let execArgs;
-            if (runnerOS === 'Windows') {
-                execArgs = ['tailscale', ...upArgs];
+            if (runnerOS === "Windows") {
+                execArgs = ["tailscale", ...upArgs];
             }
             else {
                 // Linux and macOS - use system-installed binary with sudo
-                execArgs = ['sudo', '-E', 'tailscale', ...upArgs];
+                execArgs = ["sudo", "-E", "tailscale", ...upArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
-            core.info(`Running: ${execArgs.join(' ')} (timeout: ${timeoutMs}ms)`);
+            core.info(`Running: ${execArgs.join(" ")} (timeout: ${timeoutMs}ms)`);
             await Promise.race([
                 exec.exec(execArgs[0], execArgs.slice(1)),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
             ]);
             // Success
             core.info(`✅ Tailscale up command completed successfully on attempt ${attempt}`);
@@ -41611,41 +41640,49 @@ function parseTimeout(timeout) {
     if (!match)
         return 120000; // default 2 minutes
     const value = parseInt(match[1]);
-    const unit = match[2] || 's';
+    const unit = match[2] || "s";
     switch (unit) {
-        case 's': return value * 1000;
-        case 'm': return value * 60 * 1000;
-        case 'h': return value * 60 * 60 * 1000;
-        default: return value * 1000;
+        case "s":
+            return value * 1000;
+        case "m":
+            return value * 60 * 1000;
+        case "h":
+            return value * 60 * 60 * 1000;
+        default:
+            return value * 1000;
     }
 }
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function generateCacheKey(config, runnerOS) {
     // Don't cache if version is latest or if caching is disabled
-    if (config.resolvedVersion === 'latest' || !config.useCache) {
+    if (config.resolvedVersion === "latest" || !config.useCache) {
         return undefined;
     }
     return `action-setup-tailscale/${config.resolvedVersion}/${runnerOS}-${config.arch}`;
 }
 function getToolPath(config, runnerOS) {
-    const cacheDirectory = process.env.RUNNER_TOOL_CACHE || '';
-    if (cacheDirectory === '') {
-        core.warning('Expected RUNNER_TOOL_CACHE to be defined');
+    const cacheDirectory = process.env.RUNNER_TOOL_CACHE || "";
+    if (cacheDirectory === "") {
+        core.warning("Expected RUNNER_TOOL_CACHE to be defined");
     }
-    return path.join(cacheDirectory, 'tailscale', config.resolvedVersion, `${runnerOS}-${config.arch}`);
+    return path.join(cacheDirectory, "tailscale", config.resolvedVersion, `${runnerOS}-${config.arch}`);
 }
 async function installCachedBinaries(toolPath, runnerOS) {
-    if (runnerOS === 'Linux' || runnerOS === 'macOS') {
+    if (runnerOS === "Linux" || runnerOS === "macOS") {
         // Copy cached binaries to /usr/local/bin
-        const tailscaleBin = path.join(toolPath, 'tailscale');
-        const tailscaledBin = path.join(toolPath, 'tailscaled');
+        const tailscaleBin = path.join(toolPath, "tailscale");
+        const tailscaledBin = path.join(toolPath, "tailscaled");
         if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
-            await exec.exec('sudo', ['cp', tailscaleBin, '/usr/local/bin/tailscale']);
-            await exec.exec('sudo', ['cp', tailscaledBin, '/usr/local/bin/tailscaled']);
-            await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscale']);
-            await exec.exec('sudo', ['chmod', '+x', '/usr/local/bin/tailscaled']);
+            await exec.exec("sudo", ["cp", tailscaleBin, "/usr/local/bin/tailscale"]);
+            await exec.exec("sudo", [
+                "cp",
+                tailscaledBin,
+                "/usr/local/bin/tailscaled",
+            ]);
+            await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
+            await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
         }
         else {
             throw new Error(`Cached binaries not found in ${toolPath}`);
