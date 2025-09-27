@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - master
 
 jobs:
   # Basic smoke test that doesn't require secrets

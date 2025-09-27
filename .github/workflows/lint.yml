@@ -1,0 +1,44 @@
+name: "Lint Checks"
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Basic smoke test that doesn't require secrets
+  lint-check:
+    name: Smoke Test (${{ matrix.os }})
+    
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Run formatter check
+        run: |
+          ./node_modules/.bin/prettier --check --loglevel silent "src/**/*.ts" || ( \
+            echo "Run this command on your local device to fix the error:" && \
+            echo "" && \
+            echo "  make format" && \
+            echo "" && exit 1)
+
+      - name: Run build check
+        run: |
+          npm run build && test -z "$(git status --porcelain)" || ( \
+            echo "dist is out of date, run this command on your local device to fix the error:" && \
+            echo "" && \
+            echo "  make build" && \
+            echo "" && exit 1)
