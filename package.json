@@ -22,7 +22,9 @@
   "devDependencies": {
     "@types/node": "^20.17.6",
     "@vercel/ncc": "^0.38.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "prettier": "^2.5.1",
+    "prettier-plugin-organize-imports": "^3.2.2"
   },
   "overrides": {
     "glob": "^10.3.10",
