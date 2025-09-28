@@ -11,7 +11,7 @@ jobs:
   # Matrix test for all supported platforms and architectures
   
   integration-tests:
-    name: Test ${{ matrix.os }} (${{ matrix.arch }})
+    name: ${{ matrix.os }} (${{ matrix.arch }}) tailscale-${{ matrix.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -20,31 +20,54 @@ jobs:
           - os: ubuntu-latest
             runner-os: Linux
             arch: amd64
+            version: latest
+
+          # Try unstable too
+          - os: ubuntu-latest
+            runner-os: Linux
+            arch: amd64
+            version: unstable
+
+          # Try a pinned version
+          - os: ubuntu-latest
+            runner-os: Linux
+            arch: amd64
+            version: 1.82.0
           
           # Linux tests (ARM64)
           - os: ubuntu-24.04-arm
             runner-os: Linux
             arch: arm64
+            version: latest
           
           # Windows tests (AMD64)
           - os: windows-latest
             runner-os: Windows
             arch: amd64
+            version: latest
+
+          - os: windows-latest
+            runner-os: Windows
+            arch: amd64
+            version: unstable
           
           # Windows tests (ARM64)
           - os: windows-11-arm
             runner-os: Windows
             arch: arm64
+            version: latest
             
           # macOS intel
           - os: macos-13
             runner-os: macOS
             arch: amd64
+            version: latest
           
           # macOS ARM
           - os: macos-14
             runner-os: macOS
             arch: arm64
+            version: latest
     
     runs-on: ${{ matrix.os }}
     
@@ -72,7 +95,7 @@ jobs:
           oauth-client-id: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID }}
           oauth-client-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
           tags: "tag:ci"
-          version: "1.82.0"
+          version: "${{ matrix.version }}"
           use-cache: false
           timeout: "5m"
           retry: 3

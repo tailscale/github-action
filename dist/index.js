@@ -41204,10 +41204,15 @@ async function run() {
         }
         // Get and validate inputs
         const config = await getInputs();
+        if (runnerOS === "macOS" &&
+            config.version === "unstable" &&
+            config.useCache) {
+            throw new Error("Caching of unstable releases is not supported on macOS runners");
+        }
         // Validate authentication
         validateAuth(config);
         // Resolve version
-        config.resolvedVersion = await resolveVersion(config.version);
+        config.resolvedVersion = await resolveVersion(config.version, runnerOS);
         core.info(`Resolved Tailscale version: ${config.resolvedVersion}`);
         // Set architecture
         config.arch = getTailscaleArch(runnerOS);
@@ -41268,13 +41273,17 @@ function validateAuth(config) {
         throw new Error("OAuth identity empty, please provide either an auth key or OAuth secret and tags.");
     }
 }
-async function resolveVersion(version) {
-    if (version === "latest") {
+async function resolveVersion(version, runnerOS) {
+    if (runnerOS === "macOS" && version === "unstable") {
+        return "main";
+    }
+    if (version === "latest" || version === "unstable") {
+        let path = version === "unstable" ? "unstable" : "stable";
         const { stdout } = await exec.getExecOutput("curl", [
             "-H",
             "user-agent:action-setup-tailscale",
             "-s",
-            "https://pkgs.tailscale.com/stable/?mode=json",
+            `https://pkgs.tailscale.com/${path}/?mode=json`,
         ]);
         const response = JSON.parse(stdout);
         return response.Version;
@@ -41656,8 +41665,7 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function generateCacheKey(config, runnerOS) {
-    // Don't cache if version is latest or if caching is disabled
-    if (config.resolvedVersion === "latest" || !config.useCache) {
+    if (!config.useCache) {
         return undefined;
     }
     return `action-setup-tailscale/${config.resolvedVersion}/${runnerOS}-${config.arch}`;
