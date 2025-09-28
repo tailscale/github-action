@@ -26,7 +26,7 @@ install:
 	npm install
 
 # Build the TypeScript code
-build: clean
+build: clean format
 	npm run build
 
 # Lint the TypeScript code

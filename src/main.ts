@@ -114,11 +114,21 @@ async function run(): Promise<void> {
     // Get and validate inputs
     const config = await getInputs();
 
+    if (
+      runnerOS === "macOS" &&
+      config.version === "unstable" &&
+      config.useCache
+    ) {
+      throw new Error(
+        "Caching of unstable releases is not supported on macOS runners"
+      );
+    }
+
     // Validate authentication
     validateAuth(config);
 
     // Resolve version
-    config.resolvedVersion = await resolveVersion(config.version);
+    config.resolvedVersion = await resolveVersion(config.version, runnerOS);
     core.info(`Resolved Tailscale version: ${config.resolvedVersion}`);
 
     // Set architecture
@@ -186,17 +196,26 @@ function validateAuth(config: TailscaleConfig): void {
   }
 }
 
-async function resolveVersion(version: string): Promise<string> {
-  if (version === "latest") {
+async function resolveVersion(
+  version: string,
+  runnerOS: string
+): Promise<string> {
+  if (runnerOS === "macOS" && version === "unstable") {
+    return "main";
+  }
+
+  if (version === "latest" || version === "unstable") {
+    let path = version === "unstable" ? "unstable" : "stable";
     const { stdout } = await exec.getExecOutput("curl", [
       "-H",
       "user-agent:action-setup-tailscale",
       "-s",
-      "https://pkgs.tailscale.com/stable/?mode=json",
+      `https://pkgs.tailscale.com/${path}/?mode=json`,
     ]);
     const response = JSON.parse(stdout);
     return response.Version;
   }
+
   return version;
 }
 
@@ -665,8 +684,7 @@ function generateCacheKey(
   config: TailscaleConfig,
   runnerOS: string
 ): string | undefined {
-  // Don't cache if version is latest or if caching is disabled
-  if (config.resolvedVersion === "latest" || !config.useCache) {
+  if (!config.useCache) {
     return undefined;
   }
 
