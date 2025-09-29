@@ -41123,18 +41123,29 @@ const fs = __importStar(__nccwpck_require__(79896));
 const http = __importStar(__nccwpck_require__(58611));
 const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
+const cmdTailscale = "tailscale";
+const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
+const cmdTailscaled = "tailscaled";
+const cmdTailscaledFullPath = "/usr/local/bin/tailscaled";
+const platformWin32 = "win32";
+const platformDarwin = "darwin";
+const runnerLinux = "Linux";
+const runnerWindows = "Windows";
+const runnerMacOS = "macOS";
+const versionLatest = "latest";
+const versionUnstable = "unstable";
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus() {
     const platform = os.platform();
-    if (platform === "win32") {
+    if (platform === platformWin32) {
         // Windows: use tailscale status command
-        const { stdout } = await exec.getExecOutput("tailscale", [
+        const { stdout } = await exec.getExecOutput(cmdTailscale, [
             "status",
             "--json",
         ]);
         return JSON.parse(stdout);
     }
-    else if (platform === "darwin") {
+    else if (platform === platformDarwin) {
         // macOS: use /var/run/tailscaled.socket
         return new Promise((resolve, reject) => {
             const options = {
@@ -41199,13 +41210,13 @@ async function run() {
     try {
         // Validate runner OS
         const runnerOS = process.env.RUNNER_OS || "";
-        if (!["Linux", "Windows", "macOS"].includes(runnerOS)) {
+        if (![runnerLinux, runnerWindows, runnerMacOS].includes(runnerOS)) {
             throw new Error("Support Linux, Windows, and macOS Only");
         }
         // Get and validate inputs
         const config = await getInputs();
-        if (runnerOS === "macOS" &&
-            config.version === "unstable" &&
+        if (runnerOS === runnerMacOS &&
+            config.version === versionUnstable &&
             config.useCache) {
             throw new Error("Caching of unstable releases is not supported on macOS runners");
         }
@@ -41219,7 +41230,7 @@ async function run() {
         // Install Tailscale
         await installTailscale(config, runnerOS);
         // Start daemon (non-Windows only)
-        if (runnerOS !== "Windows") {
+        if (runnerOS !== runnerWindows) {
             await startTailscaleDaemon(config);
         }
         // Connect to Tailscale
@@ -41274,11 +41285,11 @@ function validateAuth(config) {
     }
 }
 async function resolveVersion(version, runnerOS) {
-    if (runnerOS === "macOS" && version === "unstable") {
+    if (runnerOS === runnerMacOS && version === versionUnstable) {
         return "main";
     }
-    if (version === "latest" || version === "unstable") {
-        let path = version === "unstable" ? "unstable" : "stable";
+    if (version === versionLatest || version === versionUnstable) {
+        let path = version === versionUnstable ? versionUnstable : "stable";
         const { stdout } = await exec.getExecOutput("curl", [
             "-H",
             "user-agent:action-setup-tailscale",
@@ -41292,7 +41303,7 @@ async function resolveVersion(version, runnerOS) {
 }
 function getTailscaleArch(runnerOS) {
     const runnerArch = process.env.RUNNER_ARCH || "";
-    if (runnerOS === "Linux") {
+    if (runnerOS === runnerLinux) {
         switch (runnerArch) {
             case "ARM64":
                 return "arm64";
@@ -41304,7 +41315,7 @@ function getTailscaleArch(runnerOS) {
                 return "amd64";
         }
     }
-    else if (runnerOS === "Windows") {
+    else if (runnerOS === runnerWindows) {
         switch (runnerArch) {
             case "ARM64":
                 return "arm64";
@@ -41325,7 +41336,7 @@ async function installTailscale(config, runnerOS) {
         if (cacheHit) {
             core.info(`Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
             // For Windows, install the cached MSI
-            if (runnerOS === "Windows") {
+            if (runnerOS === runnerWindows) {
                 await installTailscaleWindows(config, toolPath, true);
             }
             else {
@@ -41336,13 +41347,13 @@ async function installTailscale(config, runnerOS) {
         }
     }
     // Install fresh if not cached
-    if (runnerOS === "Linux") {
+    if (runnerOS === runnerLinux) {
         await installTailscaleLinux(config, toolPath);
     }
-    else if (runnerOS === "Windows") {
+    else if (runnerOS === runnerWindows) {
         await installTailscaleWindows(config, toolPath);
     }
-    else if (runnerOS === "macOS") {
+    else if (runnerOS === runnerMacOS) {
         await installTailscaleMacOS(config, toolPath);
     }
     // Save to cache after installation
@@ -41410,18 +41421,18 @@ async function installTailscaleLinux(config, toolPath) {
     const extractedDir = path.join(extractedPath, `tailscale_${config.resolvedVersion}_${config.arch}`);
     // Create tool directory and copy binaries there for caching
     fs.mkdirSync(toolPath, { recursive: true });
-    fs.copyFileSync(path.join(extractedDir, "tailscale"), path.join(toolPath, "tailscale"));
-    fs.copyFileSync(path.join(extractedDir, "tailscaled"), path.join(toolPath, "tailscaled"));
+    fs.copyFileSync(path.join(extractedDir, cmdTailscale), path.join(toolPath, cmdTailscale));
+    fs.copyFileSync(path.join(extractedDir, cmdTailscaled), path.join(toolPath, cmdTailscaled));
     // Install binaries to /usr/local/bin
     await exec.exec("sudo", [
         "cp",
-        path.join(toolPath, "tailscale"),
-        path.join(toolPath, "tailscaled"),
+        path.join(toolPath, cmdTailscale),
+        path.join(toolPath, cmdTailscaled),
         "/usr/local/bin",
     ]);
     // Make sure they're executable
-    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
-    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
+    await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
+    await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
 }
 async function installTailscaleWindows(config, toolPath, fromCache = false) {
     // Create tool directory
@@ -41489,14 +41500,14 @@ async function installTailscaleMacOS(config, toolPath) {
     await exec.exec("git clone https://github.com/tailscale/tailscale.git tailscale");
     // Checkout the resolved version
     await exec.exec(`git checkout v${config.resolvedVersion}`, [], {
-        cwd: "tailscale",
+        cwd: cmdTailscale,
     });
     // Create tool directory and copy binaries there for caching
     fs.mkdirSync(toolPath, { recursive: true });
     // Build tailscale and tailscaled into tool directory
-    for (const binary of ["tailscale", "tailscaled"]) {
+    for (const binary of [cmdTailscale, cmdTailscaled]) {
         await exec.exec(`./build_dist.sh -o ${path.join(toolPath, binary)} ./cmd/${binary}`, [], {
-            cwd: "tailscale",
+            cwd: cmdTailscale,
             env: {
                 ...process.env,
                 TS_USE_TOOLCHAIN: "1",
@@ -41506,13 +41517,13 @@ async function installTailscaleMacOS(config, toolPath) {
     // Install binaries to /usr/local/bin
     await exec.exec("sudo", [
         "cp",
-        path.join(toolPath, "tailscale"),
-        path.join(toolPath, "tailscaled"),
+        path.join(toolPath, cmdTailscale),
+        path.join(toolPath, cmdTailscaled),
         "/usr/local/bin",
     ]);
     // Make sure they're executable
-    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
-    await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
+    await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
+    await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
     core.info("✅ Tailscale installed successfully on macOS from source");
 }
 async function startTailscaleDaemon(config) {
@@ -41530,7 +41541,7 @@ async function startTailscaleDaemon(config) {
     ];
     core.info("Starting tailscaled daemon...");
     // Start daemon in background
-    const daemon = (0, child_process_1.spawn)("sudo", ["-E", "tailscaled", ...args], {
+    const daemon = (0, child_process_1.spawn)("sudo", ["-E", cmdTailscaled, ...args], {
         detached: true,
         stdio: [
             "ignore",
@@ -41577,7 +41588,7 @@ async function connectToTailscale(config, runnerOS) {
     // Determine hostname
     let hostname = config.hostname;
     if (!hostname) {
-        if (runnerOS === "Windows") {
+        if (runnerOS === runnerWindows) {
             hostname = `github-${process.env.COMPUTERNAME}`;
         }
         else {
@@ -41598,7 +41609,7 @@ async function connectToTailscale(config, runnerOS) {
     }
     // Platform-specific args
     const platformArgs = [];
-    if (runnerOS === "Windows") {
+    if (runnerOS === runnerWindows) {
         platformArgs.push("--unattended");
     }
     // Build command
@@ -41616,12 +41627,12 @@ async function connectToTailscale(config, runnerOS) {
         try {
             core.info(`Attempt ${attempt} to bring up Tailscale...`);
             let execArgs;
-            if (runnerOS === "Windows") {
-                execArgs = ["tailscale", ...upArgs];
+            if (runnerOS === runnerWindows) {
+                execArgs = [cmdTailscale, ...upArgs];
             }
             else {
                 // Linux and macOS - use system-installed binary with sudo
-                execArgs = ["sudo", "-E", "tailscale", ...upArgs];
+                execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
             core.info(`Running: ${execArgs.join(" ")} (timeout: ${timeoutMs}ms)`);
@@ -41675,22 +41686,18 @@ function getToolPath(config, runnerOS) {
     if (cacheDirectory === "") {
         core.warning("Expected RUNNER_TOOL_CACHE to be defined");
     }
-    return path.join(cacheDirectory, "tailscale", config.resolvedVersion, `${runnerOS}-${config.arch}`);
+    return path.join(cacheDirectory, cmdTailscale, config.resolvedVersion, `${runnerOS}-${config.arch}`);
 }
 async function installCachedBinaries(toolPath, runnerOS) {
-    if (runnerOS === "Linux" || runnerOS === "macOS") {
+    if (runnerOS === runnerLinux || runnerOS === runnerMacOS) {
         // Copy cached binaries to /usr/local/bin
-        const tailscaleBin = path.join(toolPath, "tailscale");
-        const tailscaledBin = path.join(toolPath, "tailscaled");
+        const tailscaleBin = path.join(toolPath, cmdTailscale);
+        const tailscaledBin = path.join(toolPath, cmdTailscaled);
         if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
-            await exec.exec("sudo", ["cp", tailscaleBin, "/usr/local/bin/tailscale"]);
-            await exec.exec("sudo", [
-                "cp",
-                tailscaledBin,
-                "/usr/local/bin/tailscaled",
-            ]);
-            await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscale"]);
-            await exec.exec("sudo", ["chmod", "+x", "/usr/local/bin/tailscaled"]);
+            await exec.exec("sudo", ["cp", tailscaleBin, cmdTailscaleFullPath]);
+            await exec.exec("sudo", ["cp", tailscaledBin, cmdTailscaledFullPath]);
+            await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
+            await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
         }
         else {
             throw new Error(`Cached binaries not found in ${toolPath}`);
