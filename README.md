@@ -80,6 +80,7 @@ This action is written in Typescript using official GitHub SDKs. It provides som
 | `tailscaled-args` | Additional `tailscaled` arguments | false | |
 | `statedir` | State directory (if empty, uses memory) | false | |
 | `sha256sum` | Expected SHA256 checksum | false | |
+| `ping` | Comma separated list of hosts (Tailscale IP addresses or machine names if MagicDNS is enabled on the tailnet) to `tailscale ping` for connectivity verification after `tailscale up` completes | false | |
 
 ## Authentication
 
@@ -209,4 +210,6 @@ For security issues, please see our [security policy](SECURITY.md).
 
 ## CI Notes
 
-CI tests run against the tailscalegithubactionbot.github tailnet. Check our usual credential store for credentials.
+CI tests run against the pineapplefish-tailnet.org.github tailnet. Check our usual credential store for credentials.
+
+`tag:ci` must have access to the `lax-pve` server.

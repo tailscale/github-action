@@ -41241,6 +41241,7 @@ async function run() {
             core.debug(`Tailscale status: ${JSON.stringify(status)}`);
             if (status.BackendState === "Running") {
                 core.info("✅ Tailscale is running and connected!");
+                pingHostsIfNecessary(config);
                 // Explicitly exit to prevent hanging
                 process.exit(0);
             }
@@ -41252,7 +41253,9 @@ async function run() {
         catch (err) {
             core.warning(`Failed to get Tailscale status: ${err}`);
             // Still exit successfully since the main connection worked
-            core.info("✅ Tailscale connection completed successfully!");
+            core.info("✅ Tailscale daemon is connected!");
+            pingHostsIfNecessary(config);
+            // Explicitly exit to prevent hanging
             process.exit(0);
         }
     }
@@ -41260,7 +41263,36 @@ async function run() {
         core.setFailed(error instanceof Error ? error.message : String(error));
     }
 }
+async function pingHostsIfNecessary(config) {
+    const directConnectionWarning = "direct connection not established";
+    if (config.pingHosts.length == 0) {
+        return;
+    }
+    core.info(`Will ping hosts ${config.pingHosts.join(",")} up to 3 minutes in order to check connectivity`);
+    for (const host of config.pingHosts) {
+        core.info(`Pinging host ${host}`);
+        let result = await exec.getExecOutput(cmdTailscale, [
+            "ping",
+            "-c",
+            "36",
+            host,
+        ]);
+        if (result.exitCode === 0) {
+            core.info(`✅ Ping host ${host} responded!`);
+        }
+        else if (result.stderr.includes(directConnectionWarning) ||
+            result.stdout.includes(directConnectionWarning)) {
+            core.warning(`⚠️ Ping host ${host} reachable only via DERP, not direct connection.`);
+        }
+        else {
+            core.setFailed(`❌ Ping host ${host} did not respond`);
+            process.exit(1);
+        }
+    }
+}
 async function getInputs() {
+    let ping = core.getInput("ping");
+    let pingHosts = ping?.length > 0 ? ping.split(",") : [];
     return {
         version: core.getInput("version") || "1.82.0",
         resolvedVersion: "",
@@ -41277,6 +41309,7 @@ async function getInputs() {
         retry: parseInt(core.getInput("retry") || "5"),
         useCache: core.getBooleanInput("use-cache"),
         sha256Sum: core.getInput("sha256sum") || "",
+        pingHosts: pingHosts,
     };
 }
 function validateAuth(config) {
