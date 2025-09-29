@@ -41299,7 +41299,7 @@ async function getInputs() {
         arch: "",
         authKey: core.getInput("authkey") || "",
         oauthClientId: core.getInput("oauth-client-id") || "",
-        oauthSecret: core.getInput("oauth-client-secret") || "",
+        oauthSecret: core.getInput("oauth-secret") || "",
         tags: core.getInput("tags") || "",
         hostname: core.getInput("hostname") || "",
         args: core.getInput("args") || "",

@@ -41,7 +41,7 @@ This action is written in Typescript using official GitHub SDKs. It provides som
   uses: jaxxstorm/action-setup-tailscale@v1
   with:
     oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-    oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+    oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
     tags: "ci,github-actions"
     version: latest
 ```
@@ -53,7 +53,7 @@ This action is written in Typescript using official GitHub SDKs. It provides som
   uses: jaxxstorm/action-setup-tailscale@v1
   with:
     oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-    oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+    oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
     tags: "ci,github-actions,deploy"
     version: "1.82.0"
     hostname: "ci-${{ github.run_id }}"
@@ -69,7 +69,7 @@ This action is written in Typescript using official GitHub SDKs. It provides som
 |-------|-------------|----------|---------|
 | `authkey` | Tailscale authentication key | false | |
 | `oauth-client-id` | OAuth Client ID | false | |
-| `oauth-client-secret` | OAuth Client Secret | false | |
+| `oauth-secret` | OAuth Client Secret | false | |
 | `tags` | Comma-separated list of tags | false | |
 | `version` | Tailscale version to install | true | `1.82.0` |
 | `hostname` | Custom hostname | false | `github-<runner-name>` |
@@ -152,7 +152,7 @@ jobs:
         uses: jaxxstorm/action-setup-tailscale@v1
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
           tags: "ci,deploy"
           use-cache: true
       
@@ -180,7 +180,7 @@ jobs:
         uses: jaxxstorm/action-setup-tailscale@v1
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-client-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
           tags: "ci,test"
           hostname: "test-${{ matrix.os }}-${{ github.run_id }}"
           use-cache: true

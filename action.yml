@@ -12,15 +12,16 @@ inputs:
   oauth-client-id:
     description: 'Your Tailscale OAuth Client ID.'
     required: false
-  oauth-client-secret:
+  oauth-secret:
     description: 'Your Tailscale OAuth Client Secret.'
     required: false
   tags:
-    description: 'Comma separated list of tags to be applied to nodes (OAuth client must have permission to apply these tags).'
+    description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false
   version:
-    description: 'Tailscale version to use. Specify `latest` for the latest stable version.'
+    description: 'Tailscale version to use. Specify `latest` to use the latest stable version, and `unstable` to use the latest development version.'
     required: true
+    default: '1.88.3'
   args:
     description: 'Optional additional arguments to `tailscale up`.'
     required: false
@@ -30,7 +31,7 @@ inputs:
     required: false
     default: ''
   hostname:
-    description: 'Fixed hostname to use.'
+    description: 'Fixed hostname to use. Must be a valid DNS label (alphanumeric and dashes only, 1-63 characters, cannot start or end with a dash). If not provided, a hostname will be generated based on the runner name.'
     required: false
     default: ''
   timeout:
@@ -38,7 +39,7 @@ inputs:
     required: false
     default: '2m'
   retry:
-    description: 'Number of retry attempts for Tailscale connection.'
+    description: 'Number of retries for `tailscale up`.'
     required: false
     default: '5'
   use-cache:
@@ -50,7 +51,7 @@ inputs:
     required: false
     default: ''
   sha256sum:
-    description: 'Expected SHA256 checksum of the Tailscale package. If not provided, it will be fetched automatically.'
+    description: 'Expected SHA256 checksum of the tarball.'
     required: false
     default: ''
   ping:

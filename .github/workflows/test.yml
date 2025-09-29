@@ -96,7 +96,7 @@ jobs:
         uses: ./
         with:
           oauth-client-id: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID }}
-          oauth-client-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
+          oauth-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
           tags: "tag:ci"
           version: "${{ matrix.version }}"
           use-cache: false
