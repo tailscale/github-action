@@ -53,7 +53,11 @@ inputs:
     description: 'Expected SHA256 checksum of the Tailscale package. If not provided, it will be fetched automatically.'
     required: false
     default: ''
-
+  ping:
+    description: 'Comma separated list of hosts (Tailscale IP addresses or machine names if MagicDNS is enabled on the tailnet) to `tailscale ping` for connectivity verification after `tailscale up` completes.'
+    required: false
+    default: ''
+    
 runs:
   using: 'node20'
   main: 'dist/index.js'

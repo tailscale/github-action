@@ -21,6 +21,7 @@ jobs:
             runner-os: Linux
             arch: amd64
             version: latest
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
 
           # Try unstable too
           - os: ubuntu-latest
@@ -45,6 +46,7 @@ jobs:
             runner-os: Windows
             arch: amd64
             version: latest
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
 
           - os: windows-latest
             runner-os: Windows
@@ -62,6 +64,7 @@ jobs:
             runner-os: macOS
             arch: amd64
             version: latest
+            ping: 100.99.0.2 # hostnames aren't resolving on MacOS, just ping IP lax-pve.pineapplefish.ts.net,lax-pve
           
           # macOS ARM
           - os: macos-14
@@ -99,6 +102,7 @@ jobs:
           use-cache: false
           timeout: "5m"
           retry: 3
+          ping: "${{ matrix.ping }}"
       
       # Test Tailscale status command
       - name: Check Tailscale Status
