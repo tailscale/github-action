@@ -8,6 +8,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as os from "os";
 import * as path from "path";
+import { setTimeout as wait } from "timers/promises";
 
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
@@ -167,7 +168,7 @@ async function run(): Promise<void> {
       core.debug(`Tailscale status: ${JSON.stringify(status)}`);
       if (status.BackendState === "Running") {
         core.info("✅ Tailscale is running and connected!");
-        pingHostsIfNecessary(config);
+        await pingHostsIfNecessary(config);
         // Explicitly exit to prevent hanging
         process.exit(0);
       } else {
@@ -178,7 +179,7 @@ async function run(): Promise<void> {
       core.warning(`Failed to get Tailscale status: ${err}`);
       // Still exit successfully since the main connection worked
       core.info("✅ Tailscale daemon is connected!");
-      pingHostsIfNecessary(config);
+      await pingHostsIfNecessary(config);
       // Explicitly exit to prevent hanging
       process.exit(0);
     }
@@ -188,8 +189,6 @@ async function run(): Promise<void> {
 }
 
 async function pingHostsIfNecessary(config: TailscaleConfig): Promise<void> {
-  const directConnectionWarning = "direct connection not established";
-
   if (config.pingHosts.length == 0) {
     return;
   }
@@ -197,30 +196,35 @@ async function pingHostsIfNecessary(config: TailscaleConfig): Promise<void> {
   core.info(
     `Will ping hosts ${config.pingHosts.join(
       ","
-    )} up to 3 minutes in order to check connectivity`
+    )} up to 3 minutes each in order to check connectivity`
   );
   for (const host of config.pingHosts) {
-    core.info(`Pinging host ${host}`);
-    let result = await exec.getExecOutput(cmdTailscale, [
-      "ping",
-      "-c",
-      "36",
-      host,
-    ]);
+    await pingHost(host);
+  }
+}
+
+async function pingHost(host: string): Promise<void> {
+  core.info(`Pinging host ${host}`);
+  for (let i = 0; i <= 36; i++) {
+    if (i < 0) {
+      // wait 5 seconds before pinging
+      wait(5000);
+    }
+    let result = await exec.getExecOutput(
+      cmdTailscale,
+      ["ping", "-c", "1", host],
+      { ignoreReturnCode: true }
+    );
     if (result.exitCode === 0) {
-      core.info(`✅ Ping host ${host} responded!`);
-    } else if (
-      result.stderr.includes(directConnectionWarning) ||
-      result.stdout.includes(directConnectionWarning)
-    ) {
-      core.warning(
-        `⚠️ Ping host ${host} reachable only via DERP, not direct connection.`
-      );
-    } else {
-      core.setFailed(`❌ Ping host ${host} did not respond`);
-      process.exit(1);
+      core.info(`✅ Ping host ${host} reachable via direct connection!`);
+      return;
+    } else if (result.stderr.includes("direct connection not established")) {
+      core.info(`✅ Ping host ${host} reachable via DERP!`);
+      return;
     }
   }
+  core.setFailed(`❌ Ping host ${host} did not respond`);
+  process.exit(1);
 }
 
 async function getInputs(): Promise<TailscaleConfig> {
