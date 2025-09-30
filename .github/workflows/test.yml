@@ -9,7 +9,7 @@ on:
 
 jobs:
   # Matrix test for all supported platforms and architectures
-  
+
   integration-tests:
     name: ${{ matrix.os }} (${{ matrix.arch }}) tailscale-${{ matrix.version }}
     strategy:
@@ -34,13 +34,13 @@ jobs:
             runner-os: Linux
             arch: amd64
             version: 1.82.0
-          
+
           # Linux tests (ARM64)
           - os: ubuntu-24.04-arm
             runner-os: Linux
             arch: arm64
             version: latest
-          
+
           # Windows tests (AMD64)
           - os: windows-latest
             runner-os: Windows
@@ -52,46 +52,46 @@ jobs:
             runner-os: Windows
             arch: amd64
             version: unstable
-          
+
           # Windows tests (ARM64)
           - os: windows-11-arm
             runner-os: Windows
             arch: arm64
             version: latest
-            
+
           # macOS intel
           - os: macos-13
             runner-os: macOS
             arch: amd64
             version: latest
             ping: 100.99.0.2 # hostnames aren't resolving on MacOS, just ping IP lax-pve.pineapplefish.ts.net,lax-pve
-          
+
           # macOS ARM
           - os: macos-14
             runner-os: macOS
             arch: arm64
             version: latest
-    
+
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+          node-version: "20"
+          cache: "npm"
+
       - name: Install Dependencies
         run: npm ci
-      
+
       - name: Build Action
         run: npm run build
-      
+
       # Test with OAuth authentication
-      - name: Test Tailscale Setup (OAuth)
+      - name: Test Action
         id: tailscale-oauth
         uses: ./
         with:
@@ -103,7 +103,7 @@ jobs:
           timeout: "5m"
           retry: 3
           ping: "${{ matrix.ping }}"
-      
+
       # Test Tailscale status command
       - name: Check Tailscale Status
         if: steps.tailscale-oauth.outcome == 'success'
@@ -119,4 +119,3 @@ jobs:
             tailscale version
           fi
         shell: bash
-      
