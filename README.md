@@ -1,215 +1,123 @@
-# Connect Tailscale GitHub Action
+# Tailscale GitHub Action
 
-A fast, reliable GitHub Action cross platform GitHub action to connect your GitHub runners to Tailscale.
-
-## Why Use This Action?
-
-While the [official Tailscale action](https://github.com/tailscale/github-action) is great, it is a [composite action](https://docs.github.com/en/actions/tutorials/creating-a-composite-action) which means some useful things aren't available to it.
-
-This action is written in Typescript using official GitHub SDKs. It provides some improvements to the official action that might be interesting to you, such as:
-
-### 🧹 **Automatic Cleanup**
-- **Post-job logout**: Automatically runs `tailscale logout` when the job completes, ensuring clean disconnection
-
-### ⚡ **Performance Optimizations**
-- **Native TypeScript implementation**: Compiled to single JavaScript files for faster startup, comparison tests show this action is up to **40% faster** than the official action on Linux
-- **Smart status checking**: Calls the localAPI to determine when the connection is ready, reducing the need for sleeps within the action
-- **Modified Defaults**: The usage of more reliable status checking means the backoffs and retries can be tuned
-
-### 🔧 **Enhanced Cross-Platform Support**
-- **Native Support for All GitHub supported OSS**: Supports Linux, Windows, and macOS runners and all architectures
-- **Native crypto verification**: Uses Node.js crypto module instead of external tools for SHA256 verification
-- **Improved Windows handling**: Better MSI installation and authentication timing
-- **Consistent caching**: Caching built using the TypeScript SDKs meaning more flexibility.
-
-## Usage
-
-### Basic Usage
+This GitHub Action connects to your [Tailscale network](https://tailscale.com)
+by adding a step to your workflow.
 
 ```yaml
-- name: Connect to Tailscale
-  uses: jaxxstorm/action-setup-tailscale@v1
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      tags: tag:ci
+```
+
+Subsequent steps in the Action can then access nodes in your Tailnet.
+
+oauth-client-id and oauth-secret are an [OAuth client](https://tailscale.com/s/oauth-clients/)
+for the tailnet to be accessed. We recommend storing these as
+[GitHub Encrypted Secrets.](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+OAuth clients used for this purpose must have the
+[`auth_keys` scope.](https://tailscale.com/kb/1215/oauth-clients#scopes)
+
+tags is a comma-separated list of one or more [ACL Tags](https://tailscale.com/kb/1068/acl-tags/)
+for the node. At least one tag is required: an OAuth client is not associated
+with any of the Users on the tailnet, it has to Tag its nodes.
+
+Nodes created by this Action are [marked as Ephemeral](https://tailscale.com/s/ephemeral-nodes) to
+and log out immediately after finishing their CI run, at which point they are automatically removed
+by the coordination. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
+on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
+
+## Eventual consistency
+
+Propagating information about new peers - such as the node created by this action - across your tailnet
+is an eventually consistent process, and brief delays are expected. Until the GitHub workflow node 
+becomes visible, other peers will not accept connections. It is best to verify connectivity to the 
+intended nodes before executing steps that rely on them.
+
+You can do this by adding a list of hosts to ping to the action configuration:
+
+```yaml
+- name: Tailscale
+  uses: tailscale/github-action@v3
   with:
-    authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-    version: latest
+    ping: 100.x.y.z,my-machine.my-tailnet.ts.net
 ```
 
-### OAuth Authentication (Recommended)
+or with the [tailscale ping](https://tailscale.com/kb/1080/cli#ping) command if you do not know the peers at the time of installing Tailscale in the workflow:
+
+```bash
+tailscale ping my-target.my-tailnet.ts.net
+```
+
+> ⚠️ On macOS runners, one can only ping IP addresses, not hostnames.
+
+## Tailnet Lock
+
+If you are using this Action in a [Tailnet
+Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
+
+* Authenticate using an ephemeral reusable [pre-signed auth key](
+  https://tailscale.com/kb/1226/tailnet-lock#add-a-node-using-a-pre-signed-auth-key)
+  rather than an OAuth client.
+* Specify a [state directory](
+  https://tailscale.com/kb/1278/tailscaled#flags-to-tailscaled) for the
+  client to store the Tailnet Key Authority data in.
 
 ```yaml
-- name: Connect to Tailscale
-  uses: jaxxstorm/action-setup-tailscale@v1
-  with:
-    oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-    oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-    tags: "ci,github-actions"
-    version: latest
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      authkey: tskey-auth-...
+      statedir: /tmp/tailscale-state/
 ```
 
-### Advanced Configuration
+## Defining Tailscale version
+
+Which Tailscale version to use can be set like this:
 
 ```yaml
-- name: Connect to Tailscale
-  uses: jaxxstorm/action-setup-tailscale@v1
-  with:
-    oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-    oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-    tags: "ci,github-actions,deploy"
-    version: "1.82.0"
-    hostname: "ci-${{ github.run_id }}"
-    timeout: "30s"
-    retry: 3
-    use-cache: true
-    args: "--ssh"
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      tags: tag:ci
+      version: 1.52.0
 ```
 
-## Inputs
-
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `authkey` | Tailscale authentication key | false | |
-| `oauth-client-id` | OAuth Client ID | false | |
-| `oauth-secret` | OAuth Client Secret | false | |
-| `tags` | Comma-separated list of tags | false | |
-| `version` | Tailscale version to install | true | `1.82.0` |
-| `hostname` | Custom hostname | false | `github-<runner-name>` |
-| `timeout` | Connection timeout | false | `60s` |
-| `retry` | Number of retry attempts | false | `5` |
-| `use-cache` | Enable binary caching | false | `false` |
-| `args` | Additional `tailscale up` arguments | false | |
-| `tailscaled-args` | Additional `tailscaled` arguments | false | |
-| `statedir` | State directory (if empty, uses memory) | false | |
-| `sha256sum` | Expected SHA256 checksum | false | |
-| `ping` | Comma separated list of hosts (Tailscale IP addresses or machine names if MagicDNS is enabled on the tailnet) to `tailscale ping` for connectivity verification after `tailscale up` completes | false | |
-
-## Authentication
-
-### OAuth (Recommended)
-
-OAuth provides better security and is the recommended approach:
-
-1. Create an OAuth client in the [Tailscale admin panel](https://tailscale.com/s/oauth-clients)
-2. Grant necessary permissions (typically "Write" for devices)
-3. Add the client ID and secret to your GitHub repository secrets
-4. Specify appropriate tags that the OAuth client can manage
-
-### Auth Key (Legacy)
-
-While still supported, auth keys are less secure for CI/CD:
-
-1. Generate an auth key in the Tailscale admin panel
-2. Add it to your GitHub repository secrets
-3. Use the `authkey` input
-
-## Platform Support
-
-- ✅ **Linux** (Ubuntu, Amazon Linux, etc.)
-- ✅ **Windows** (Windows Server 2019, 2022)
-- ✅ **macOS** (macOS 11, 12, 13+)
-
-## Caching
-
-Enable caching to speed up subsequent workflow runs:
+If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
-- uses: jaxxstorm/action-setup-tailscale@v1
-  with:
-    use-cache: true
-    # ... other inputs
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      tags: tag:ci
+      version: latest
 ```
 
-**Benefits:**
-- **Linux/macOS**: Caches extracted binaries
-- **Windows**: Caches MSI installer
-- **All platforms**: Includes SHA256 verification for integrity
+You can find the latest Tailscale stable version number at
+https://pkgs.tailscale.com/stable/#static.
 
-## Performance Comparison
+You can also specify `version: unstable` to use the latest unstable version of Tailscale.
+For Linux and Windows, this uses the version published at https://pkgs.tailscale.com/unstable,
+and for MacOS it uses the HEAD of the `main` branch of https://github.com/tailscale/tailscale/.
 
-| Feature | This Action | Official Action |
-|---------|-------------|-----------------|
-| Default timeout | 60s | 2m |
-| Retry interval | 2s incremental | 5s fixed |
-| Windows status check | Native command | HTTP/Named pipes |
-| Crypto verification | Native Node.js | External tools |
-| Post-job cleanup | ✅ Automatic | ❌ Manual |
-| MSI caching | ✅ Supported | ❌ Not available |
+## Cache Tailscale binaries
 
-## Examples
+Caching can reduce download times and download failures on runners with slower network connectivity.
+As of v4 of this action, caching is enabled by default.
 
-### Deploy to Private Server
+Although caching is generally recommended, you can disable it by passing `'false'` to the `use-cache` input:
 
 ```yaml
-name: Deploy
-on: [push]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Connect to Tailscale
-        uses: jaxxstorm/action-setup-tailscale@v1
-        with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: "ci,deploy"
-          use-cache: true
-      
-      - name: Deploy to server
-        run: |
-          ssh deploy@private-server "deploy.sh"
+  - name: Tailscale
+    uses: tailscale/github-action@v3
+    with:
+      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+      use-cache: 'false'
 ```
-
-### Multi-Platform Testing
-
-```yaml
-name: Test
-on: [push]
-
-jobs:
-  test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Connect to Tailscale
-        uses: jaxxstorm/action-setup-tailscale@v1
-        with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: "ci,test"
-          hostname: "test-${{ matrix.os }}-${{ github.run_id }}"
-          use-cache: true
-      
-      - name: Run tests
-        run: |
-          # Your tests that require Tailscale connectivity
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `npm run build` to compile TypeScript
-5. Submit a pull request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Security
-
-This action automatically logs out of Tailscale when the job completes, ensuring no persistent connections remain. For OAuth authentication, connections are ephemeral by default.
-
-For security issues, please see our [security policy](SECURITY.md).
-
-## CI Notes
-
-CI tests run against the pineapplefish-tailnet.org.github tailnet. Check our usual credential store for credentials.
-
-`tag:ci` must have access to the `lax-pve` server.

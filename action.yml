@@ -1,3 +1,6 @@
+# Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
 name: 'Action Setup Tailscale'
 description: 'Connect your GitHub Action workflow to Tailscale'
 branding:
