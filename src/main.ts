@@ -1,3 +1,6 @@
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
