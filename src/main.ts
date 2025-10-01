@@ -199,19 +199,25 @@ async function pingHostsIfNecessary(config: TailscaleConfig): Promise<void> {
   core.info(
     `Will ping hosts ${config.pingHosts.join(
       ","
-    )} up to 3 minutes each in order to check connectivity`
+    )} up to 3 minutes each (in parallel) in order to check connectivity`
   );
-  for (const host of config.pingHosts) {
-    await pingHost(host);
+  let pings = config.pingHosts.map((host) => pingHost(host));
+  for (const ping of pings) {
+    await ping;
   }
 }
 
 async function pingHost(host: string): Promise<void> {
   core.info(`Pinging host ${host}`);
-  for (let i = 0; i <= 36; i++) {
-    if (i < 0) {
-      // wait 5 seconds before pinging
-      wait(5000);
+  let start = new Date().getTime();
+  var i = 0;
+  // Try for up to 180 seconds (3 minutes).
+  while ((new Date().getTime() - start) / 1000 < 180) {
+    if (i > 0) {
+      // Exponential backoff on wait time, with maximum 5 second wait.
+      let waitTime = Math.min(Math.pow(1.3, i), 5000);
+      core.debug(`Waiting ${waitTime} milliseconds before pinging`);
+      await wait(waitTime);
     }
     let result = await exec.getExecOutput(
       cmdTailscale,
@@ -222,9 +228,11 @@ async function pingHost(host: string): Promise<void> {
       core.info(`✅ Ping host ${host} reachable via direct connection!`);
       return;
     } else if (result.stderr.includes("direct connection not established")) {
+      // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
       core.info(`✅ Ping host ${host} reachable via DERP!`);
       return;
     }
+    i++;
   }
   core.setFailed(`❌ Ping host ${host} did not respond`);
   process.exit(1);

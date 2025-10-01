@@ -5,7 +5,7 @@ by adding a step to your workflow.
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v3
+    uses: tailscale/github-action@v4
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -40,7 +40,7 @@ You can do this by adding a list of hosts to ping to the action configuration:
 
 ```yaml
 - name: Tailscale
-  uses: tailscale/github-action@v3
+  uses: tailscale/github-action@v4
   with:
     ping: 100.x.y.z,my-machine.my-tailnet.ts.net
 ```
@@ -50,6 +50,8 @@ or with the [tailscale ping](https://tailscale.com/kb/1080/cli#ping) command if 
 ```bash
 tailscale ping my-target.my-tailnet.ts.net
 ```
+
+The `ping` option will wait up to to 3 minutes for a connection (direct or relayed).
 
 > ⚠️ On macOS runners, one can only ping IP addresses, not hostnames.
 
@@ -67,7 +69,7 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v3
+    uses: tailscale/github-action@v4
     with:
       authkey: tskey-auth-...
       statedir: /tmp/tailscale-state/
@@ -79,7 +81,7 @@ Which Tailscale version to use can be set like this:
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v3
+    uses: tailscale/github-action@v4
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -91,7 +93,7 @@ If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v3
+    uses: tailscale/github-action@v4
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -115,7 +117,7 @@ Although caching is generally recommended, you can disable it by passing `'false
 
 ```yaml
   - name: Tailscale
-    uses: tailscale/github-action@v3
+    uses: tailscale/github-action@v4
     with:
       oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
       oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
