@@ -243,7 +243,7 @@ async function getInputs(): Promise<TailscaleConfig> {
   let pingHosts = ping?.length > 0 ? ping.split(",") : [];
 
   return {
-    version: core.getInput("version") || "1.82.0",
+    version: core.getInput("version") || "1.88.3",
     resolvedVersion: "",
     arch: "",
     authKey: core.getInput("authkey") || "",
