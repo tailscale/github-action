@@ -4,12 +4,12 @@ This GitHub Action connects to your [Tailscale network](https://tailscale.com)
 by adding a step to your workflow.
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v4
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
 ```
 
 Subsequent steps in the Action can then access nodes in your Tailnet.
@@ -32,8 +32,8 @@ on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-app
 ## Eventual consistency
 
 Propagating information about new peers - such as the node created by this action - across your tailnet
-is an eventually consistent process, and brief delays are expected. Until the GitHub workflow node 
-becomes visible, other peers will not accept connections. It is best to verify connectivity to the 
+is an eventually consistent process, and brief delays are expected. Until the GitHub workflow node
+becomes visible, other peers will not accept connections. It is best to verify connectivity to the
 intended nodes before executing steps that rely on them.
 
 You can do this by adding a list of hosts to ping to the action configuration:
@@ -60,19 +60,17 @@ The `ping` option will wait up to to 3 minutes for a connection (direct or relay
 If you are using this Action in a [Tailnet
 Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
 
-* Authenticate using an ephemeral reusable [pre-signed auth key](
-  https://tailscale.com/kb/1226/tailnet-lock#add-a-node-using-a-pre-signed-auth-key)
+- Authenticate using an ephemeral reusable [pre-signed auth key](https://tailscale.com/kb/1226/tailnet-lock#add-a-node-using-a-pre-signed-auth-key)
   rather than an OAuth client.
-* Specify a [state directory](
-  https://tailscale.com/kb/1278/tailscaled#flags-to-tailscaled) for the
+- Specify a [state directory](https://tailscale.com/kb/1278/tailscaled#flags-to-tailscaled) for the
   client to store the Tailnet Key Authority data in.
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v4
-    with:
-      authkey: tskey-auth-...
-      statedir: /tmp/tailscale-state/
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    authkey: tskey-auth-...
+    statedir: /tmp/tailscale-state/
 ```
 
 ## Defining Tailscale version
@@ -80,25 +78,25 @@ Lock](https://tailscale.com/kb/1226/tailnet-lock) enabled network, you need to:
 Which Tailscale version to use can be set like this:
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v4
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: 1.52.0
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: 1.52.0
 ```
 
 If you'd like to specify the latest version, simply set the version as `latest`
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v4
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      tags: tag:ci
-      version: latest
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    version: latest
 ```
 
 You can find the latest Tailscale stable version number at
@@ -116,10 +114,10 @@ As of v4 of this action, caching is enabled by default.
 Although caching is generally recommended, you can disable it by passing `'false'` to the `use-cache` input:
 
 ```yaml
-  - name: Tailscale
-    uses: tailscale/github-action@v4
-    with:
-      oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-      use-cache: 'false'
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    use-cache: "false"
 ```
