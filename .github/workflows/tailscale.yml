@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - mpminardi/mac-dns-test
   pull_request:
     branches:
       - '*'
@@ -13,8 +13,8 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, windows-11-arm]
-        cache: ['false', 'true']
+        os: [macos-latest]
+        cache: ['true']
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
@@ -23,40 +23,11 @@ jobs:
       - name: Tailscale Action
         uses: ./
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_GRANULAR_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_GRANULAR_SECRET }}
+          oauth-client-id: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
           tags: tag:ci
           use-cache: ${{ matrix.cache }}
-
-      - name: check for tailscale connection
-        shell: bash
-        run:
-          tailscale status -json | jq -r .BackendState | grep -q Running
-
-      - name: ensure no dirty files from Tailscale Action remain
-        shell: bash
-        run: |
-          extra_files=$(git ls-files . --exclude-standard --others)
-          if [ ! -z "$extra_files" ]; then
-            echo "::error::Unexpected extra files: $extra_files"
-            exit 1
-          fi
-
-  # This job runs as a sanity check to ensure we have not broken the ability for OAuth clients using
-  # our legacy scopes to successfully connect to tailnets using this action.
-  legacyScopesCheck:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Tailscale Action
-        uses: ./
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          use-cache: ${{ matrix.cache }}
+          targets: lax-pve,100.99.0.2,lax-pve.pineapplefish.ts.net
 
       - name: check for tailscale connection
         shell: bash

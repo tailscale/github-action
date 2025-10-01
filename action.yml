@@ -363,6 +363,7 @@ runs:
         env:
           TARGETS: ${{ inputs.targets }}
         run: |
+          set +e
           IFS=',' read -ra TARGET_ARRAY <<< "$TARGETS"
 
           if [ "${{ runner.os }}" != "Windows" ]; then
@@ -383,6 +384,7 @@ runs:
               else
                 # Regular failure case
                 echo "Failed to reach $target"
+                echo "$output"
                 failed_targets+=("$target")
               fi
             fi
