@@ -8,6 +8,17 @@ async function logout(): Promise<void> {
   try {
     const runnerOS = process.env.RUNNER_OS || "";
 
+    if (runnerOS === "macOS") {
+      // The below is required to allow GitHub's post job cleanup to complete.
+      core.info("Resetting DNS settings on macOS");
+      await exec.exec("networksetup", ["-setdnsservers", "Ethernet", "Empty"]);
+      await exec.exec("networksetup", [
+        "-setsearchdomains",
+        "Ethernet",
+        "Empty",
+      ]);
+    }
+
     core.info("🔄 Logging out of Tailscale...");
 
     // Check if tailscale is available first

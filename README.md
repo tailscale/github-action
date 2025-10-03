@@ -53,8 +53,6 @@ tailscale ping my-target.my-tailnet.ts.net
 
 The `ping` option will wait up to to 3 minutes for a connection (direct or relayed).
 
-> ⚠️ On macOS runners, one can only ping IP addresses, not hostnames.
-
 ## Tailnet Lock
 
 If you are using this Action in a [Tailnet
