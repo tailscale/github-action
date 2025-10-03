@@ -59,18 +59,26 @@ jobs:
             arch: arm64
             version: latest
 
-          # macOS intel
+          # macOS 13 (AMD64)
           - os: macos-13
             runner-os: macOS
             arch: amd64
             version: latest
-            ping: 100.99.0.2 # hostnames aren't resolving on MacOS, just ping IP lax-pve.pineapplefish.ts.net,lax-pve
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
 
-          # macOS ARM
+          # macOS 14 (ARM)
           - os: macos-14
             runner-os: macOS
             arch: arm64
             version: latest
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+
+          # macOS latest (ARM)
+          - os: macos-latest
+            runner-os: macOS
+            arch: arm64
+            version: latest
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
 
     runs-on: ${{ matrix.os }}
 
@@ -103,6 +111,13 @@ jobs:
           timeout: "5m"
           retry: 3
           ping: "${{ matrix.ping }}"
+
+      # Look up names to make sure MagicDNS is working
+      - name: Look up qualified name
+        run: nslookup lax-pve.pineapplefish.ts.net
+
+      - name: Look up unqualified name
+        run: nslookup lax-pve
 
       # Test Tailscale status command
       - name: Check Tailscale Status
