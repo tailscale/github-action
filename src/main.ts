@@ -47,8 +47,18 @@ interface TailscaleConfig {
   pingHosts: string[];
 }
 
+type tailnetInfo = {
+  MagicDNSSuffix: string;
+  MagicDNSEnabled: boolean;
+};
+
+type tailscaleStatus = {
+  BackendState: string;
+  CurrentTailnet: tailnetInfo;
+};
+
 // Cross-platform Tailscale local API status check
-async function getTailscaleStatus(): Promise<any> {
+async function getTailscaleStatus(): Promise<tailscaleStatus> {
   const platform = os.platform();
 
   if (platform === platformWin32) {
@@ -171,6 +181,9 @@ async function run(): Promise<void> {
       core.debug(`Tailscale status: ${JSON.stringify(status)}`);
       if (status.BackendState === "Running") {
         core.info("✅ Tailscale is running and connected!");
+        if (runnerOS === runnerMacOS) {
+          await configureDNSOnMacOS(status);
+        }
         await pingHostsIfNecessary(config);
         // Explicitly exit to prevent hanging
         process.exit(0);
@@ -180,6 +193,12 @@ async function run(): Promise<void> {
       }
     } catch (err) {
       core.warning(`Failed to get Tailscale status: ${err}`);
+      if (runnerOS === runnerMacOS) {
+        core.setFailed(
+          `❌ Tailscale status is required in order to configure macOS`
+        );
+        process.exit(2);
+      }
       // Still exit successfully since the main connection worked
       core.info("✅ Tailscale daemon is connected!");
       await pingHostsIfNecessary(config);
@@ -796,6 +815,31 @@ async function installCachedBinaries(
     } else {
       throw new Error(`Cached binaries not found in ${toolPath}`);
     }
+  }
+}
+
+async function configureDNSOnMacOS(status: tailscaleStatus): Promise<void> {
+  if (!status.CurrentTailnet.MagicDNSEnabled) {
+    core.info("MagicDNS is disabled, not configuring DNS");
+    return;
+  }
+
+  core.info(
+    `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`
+  );
+  try {
+    await exec.exec("networksetup", [
+      "-setdnsservers",
+      "Ethernet",
+      "100.100.100.100",
+    ]);
+    await exec.exec("networksetup", [
+      "-setsearchdomains",
+      "Ethernet",
+      status.CurrentTailnet.MagicDNSSuffix,
+    ]);
+  } catch (e) {
+    throw Error(`Failed to configure DNS on macOS: ${e}`);
   }
 }
 
