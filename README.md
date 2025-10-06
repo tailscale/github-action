@@ -26,8 +26,18 @@ with any of the Users on the tailnet, it has to Tag its nodes.
 
 Nodes created by this Action are [marked as Ephemeral](https://tailscale.com/s/ephemeral-nodes) to
 and log out immediately after finishing their CI run, at which point they are automatically removed
-by the coordination. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
+by the coordination server. The nodes are also [marked Preapproved](https://tailscale.com/kb/1085/auth-keys/)
 on tailnets which use [Device Approval](https://tailscale.com/kb/1099/device-approval/)
+
+## Prerequisites
+
+Before using the Tailscale GitHub Action, ensure you have the following:
+
+1. A Tailscale account with <Role>Owner, Admin, or Network admin</Role> permissions.
+1. A GitHub repository that you have admin access to (required to set up the GitHub Action).
+1. At least one configured [tag][kb-tags].
+1. An [OAuth client][kb-oauth-clients] ID and secret OR an [auth key][kb-auth-keys].
+1. A runner image version >= 2.237.1 (required to support running Node.js 24).
 
 ## Eventual consistency
 

@@ -8,7 +8,6 @@ import * as tc from "@actions/tool-cache";
 import { spawn } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
-import * as http from "http";
 import * as os from "os";
 import * as path from "path";
 import { setTimeout as wait } from "timers/promises";
@@ -59,78 +58,11 @@ type tailscaleStatus = {
 
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
-  const platform = os.platform();
-
-  if (platform === platformWin32) {
-    // Windows: use tailscale status command
-    const { stdout } = await exec.getExecOutput(cmdTailscale, [
-      "status",
-      "--json",
-    ]);
-    return JSON.parse(stdout);
-  } else if (platform === platformDarwin) {
-    // macOS: use /var/run/tailscaled.socket
-    return new Promise((resolve, reject) => {
-      const options: http.RequestOptions = {
-        socketPath: "/var/run/tailscaled.socket",
-        path: "/localapi/v0/status",
-        method: "GET",
-        headers: { Host: "local-tailscaled.sock" },
-      };
-
-      const req = http.request(options, (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      });
-
-      // Set timeout to prevent hanging
-      req.setTimeout(5000, () => {
-        req.destroy();
-        reject(new Error("Request timeout"));
-      });
-
-      req.on("error", reject);
-      req.end();
-    });
-  } else {
-    // Linux: use Unix socket
-    return new Promise((resolve, reject) => {
-      const options: http.RequestOptions = {
-        socketPath: "/run/tailscale/tailscaled.sock",
-        path: "/localapi/v0/status",
-        method: "GET",
-        headers: { Host: "local-tailscaled.sock" },
-      };
-
-      const req = http.request(options, (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      });
-
-      // Set timeout to prevent hanging
-      req.setTimeout(5000, () => {
-        req.destroy();
-        reject(new Error("Request timeout"));
-      });
-
-      req.on("error", reject);
-      req.end();
-    });
-  }
+  const { stdout } = await exec.getExecOutput(cmdTailscale, [
+    "status",
+    "--json",
+  ]);
+  return JSON.parse(stdout);
 }
 
 async function run(): Promise<void> {

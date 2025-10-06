@@ -41122,7 +41122,6 @@ const tc = __importStar(__nccwpck_require__(33472));
 const child_process_1 = __nccwpck_require__(35317);
 const crypto = __importStar(__nccwpck_require__(76982));
 const fs = __importStar(__nccwpck_require__(79896));
-const http = __importStar(__nccwpck_require__(58611));
 const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
 const promises_1 = __nccwpck_require__(16460);
@@ -41139,75 +41138,11 @@ const versionLatest = "latest";
 const versionUnstable = "unstable";
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus() {
-    const platform = os.platform();
-    if (platform === platformWin32) {
-        // Windows: use tailscale status command
-        const { stdout } = await exec.getExecOutput(cmdTailscale, [
-            "status",
-            "--json",
-        ]);
-        return JSON.parse(stdout);
-    }
-    else if (platform === platformDarwin) {
-        // macOS: use /var/run/tailscaled.socket
-        return new Promise((resolve, reject) => {
-            const options = {
-                socketPath: "/var/run/tailscaled.socket",
-                path: "/localapi/v0/status",
-                method: "GET",
-                headers: { Host: "local-tailscaled.sock" },
-            };
-            const req = http.request(options, (res) => {
-                let data = "";
-                res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                    try {
-                        resolve(JSON.parse(data));
-                    }
-                    catch (e) {
-                        reject(e);
-                    }
-                });
-            });
-            // Set timeout to prevent hanging
-            req.setTimeout(5000, () => {
-                req.destroy();
-                reject(new Error("Request timeout"));
-            });
-            req.on("error", reject);
-            req.end();
-        });
-    }
-    else {
-        // Linux: use Unix socket
-        return new Promise((resolve, reject) => {
-            const options = {
-                socketPath: "/run/tailscale/tailscaled.sock",
-                path: "/localapi/v0/status",
-                method: "GET",
-                headers: { Host: "local-tailscaled.sock" },
-            };
-            const req = http.request(options, (res) => {
-                let data = "";
-                res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                    try {
-                        resolve(JSON.parse(data));
-                    }
-                    catch (e) {
-                        reject(e);
-                    }
-                });
-            });
-            // Set timeout to prevent hanging
-            req.setTimeout(5000, () => {
-                req.destroy();
-                reject(new Error("Request timeout"));
-            });
-            req.on("error", reject);
-            req.end();
-        });
-    }
+    const { stdout } = await exec.getExecOutput(cmdTailscale, [
+        "status",
+        "--json",
+    ]);
+    return JSON.parse(stdout);
 }
 async function run() {
     try {
