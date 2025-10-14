@@ -58,10 +58,21 @@ type tailscaleStatus = {
 
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
-  const { stdout } = await exec.getExecOutput(cmdTailscale, [
-    "status",
-    "--json",
-  ]);
+  const { exitCode, stdout, stderr } = await exec.getExecOutput(
+    cmdTailscale,
+    ["status", "--json"],
+    {
+      silent: true,
+      ignoreReturnCode: true,
+    }
+  );
+  if (exitCode !== 0) {
+    process.stderr.write(stderr);
+    throw new Error(`tailscale status failed with exit code ${exitCode}`);
+  }
+  if (core.isDebug()) {
+    process.stdout.write(stdout);
+  }
   return JSON.parse(stdout);
 }
 
@@ -110,7 +121,6 @@ async function run(): Promise<void> {
     // Check Tailscale status (cross-platform)
     try {
       const status = await getTailscaleStatus();
-      core.debug(`Tailscale status: ${JSON.stringify(status)}`);
       if (status.BackendState === "Running") {
         core.info("✅ Tailscale is running and connected!");
         if (runnerOS === runnerMacOS) {
@@ -574,6 +584,7 @@ async function waitForDaemonReady(): Promise<void> {
 
   core.info("Waiting for tailscaled daemon to become ready...");
 
+  var lastErr: any;
   while (waited < maxWaitMs) {
     try {
       const status = await getTailscaleStatus();
@@ -586,13 +597,16 @@ async function waitForDaemonReady(): Promise<void> {
       }
     } catch (err) {
       // Daemon not ready yet, keep polling
+      lastErr = err;
       core.debug(`Waiting for daemon... (${waited}ms elapsed)`);
     }
     await sleep(pollIntervalMs);
     waited += pollIntervalMs;
   }
 
-  throw new Error("tailscaled daemon did not become ready within timeout");
+  throw new Error(
+    `tailscaled daemon did not become ready within timeout, last error: ${lastErr}`
+  );
 }
 
 async function connectToTailscale(
