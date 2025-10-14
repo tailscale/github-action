@@ -4,6 +4,7 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import { ExecOptions } from "@actions/exec";
 import * as tc from "@actions/tool-cache";
 import { spawn } from "child_process";
 import * as crypto from "crypto";
@@ -58,11 +59,21 @@ type tailscaleStatus = {
 
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
-  const { stdout } = await exec.getExecOutput(cmdTailscale, [
-    "status",
-    "--json",
-  ]);
-  return JSON.parse(stdout);
+  let output = "";
+  const options: ExecOptions = {
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  };
+  const { stdout } = await exec.getExecOutput(
+    cmdTailscale,
+    ["status", "--json"],
+    options
+  );
+  return JSON.parse(output);
 }
 
 async function run(): Promise<void> {
