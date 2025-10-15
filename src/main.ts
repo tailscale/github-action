@@ -203,13 +203,26 @@ async function getInputs(): Promise<TailscaleConfig> {
   let ping = core.getInput("ping");
   let pingHosts = ping?.length > 0 ? ping.split(",") : [];
 
+  const authKey = core.getInput("authkey") || "";
+  const oauthSecret = core.getInput("oauth-secret") || "";
+
+  // Mask sensitive values in logs unless debug mode is enabled
+  if (!core.isDebug()) {
+    if (authKey) {
+      core.setSecret(authKey);
+    }
+    if (oauthSecret) {
+      core.setSecret(oauthSecret);
+    }
+  }
+
   return {
     version: core.getInput("version") || "1.88.3",
     resolvedVersion: "",
     arch: "",
-    authKey: core.getInput("authkey") || "",
+    authKey: authKey,
     oauthClientId: core.getInput("oauth-client-id") || "",
-    oauthSecret: core.getInput("oauth-secret") || "",
+    oauthSecret: oauthSecret,
     tags: core.getInput("tags") || "",
     hostname: core.getInput("hostname") || "",
     args: core.getInput("args") || "",
