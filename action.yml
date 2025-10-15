@@ -18,6 +18,10 @@ inputs:
   oauth-secret:
     description: 'Your Tailscale OAuth Client Secret.'
     required: false
+  wif-client-id:
+    description: 'Your Tailscale Workload Identity Federation Client ID'
+  wif-audience:
+    description: 'Your Tailscale Workload Identity Federation Audience'
   tags:
     description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
     required: false

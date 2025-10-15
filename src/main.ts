@@ -3,7 +3,9 @@
 
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
+import { error } from "@actions/core";
 import * as exec from "@actions/exec";
+import * as client from "@actions/http-client";
 import * as tc from "@actions/tool-cache";
 import { spawn } from "child_process";
 import * as crypto from "crypto";
@@ -16,9 +18,6 @@ const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
 const cmdTailscaledFullPath = "/usr/local/bin/tailscaled";
-
-const platformWin32 = "win32";
-const platformDarwin = "darwin";
 
 const runnerLinux = "Linux";
 const runnerWindows = "Windows";
@@ -34,6 +33,8 @@ interface TailscaleConfig {
   authKey: string;
   oauthClientId: string;
   oauthSecret: string;
+  wifClientId: string;
+  wifAudience: string;
   tags: string;
   hostname: string;
   args: string;
@@ -210,6 +211,8 @@ async function getInputs(): Promise<TailscaleConfig> {
     authKey: core.getInput("authkey") || "",
     oauthClientId: core.getInput("oauth-client-id") || "",
     oauthSecret: core.getInput("oauth-secret") || "",
+    wifClientId: core.getInput("wif-client-id") || "",
+    wifAudience: core.getInput("wif-audience") || "",
     tags: core.getInput("tags") || "",
     hostname: core.getInput("hostname") || "",
     args: core.getInput("args") || "",
@@ -224,9 +227,13 @@ async function getInputs(): Promise<TailscaleConfig> {
 }
 
 function validateAuth(config: TailscaleConfig): void {
-  if (!config.authKey && (!config.oauthSecret || !config.tags)) {
+  if (
+    !config.authKey &&
+    (!config.oauthSecret || !config.tags) &&
+    (!config.wifClientId || !config.wifAudience || !config.tags)
+  ) {
     throw new Error(
-      "OAuth identity empty, please provide either an auth key or OAuth secret and tags."
+      "Please provide either an auth key, OAuth secret and tags, or Workload identity federation information with tags "
     );
   }
 }
@@ -636,6 +643,12 @@ async function connectToTailscale(
     if (config.tags) {
       tagsArg.push(`--advertise-tags=${config.tags}`);
     }
+  } else if (config.wifAudience) {
+    // TODO(mpminardi): throw this all out!
+    finalAuthKey = await generateWIFAuthKey(config);
+    if (config.tags) {
+      tagsArg.push(`--advertise-tags=${config.tags}`);
+    }
   }
 
   // Platform-specific args
@@ -694,6 +707,85 @@ async function connectToTailscale(
       await sleep(sleepTime * 1000);
     }
   }
+}
+
+async function doTokenExchange(config: TailscaleConfig): Promise<string> {
+  const token = await core.getIDToken(config.wifAudience);
+
+  const { stdout, stderr, exitCode } = await exec.getExecOutput(
+    "curl",
+    [
+      "-H",
+      "user-agent:action-setup-tailscale",
+      "-H",
+      "content-type:application/x-www-form-urlencoded",
+      "-d",
+      `client_id=${config.wifClientId}`,
+      "-d",
+      `jwt=${token}`,
+      "-s",
+      "https://api.tailscale.com/api/v2/oauth/token-exchange",
+    ],
+    {
+      silent: true,
+      ignoreReturnCode: true,
+    }
+  );
+  if (exitCode !== 0) {
+    process.stderr.write(stderr);
+    throw new Error(`token exchange failed with exit code ${exitCode}`);
+  }
+  const response = JSON.parse(stdout);
+  const access_token = response.access_token;
+  if (!access_token) {
+    throw new error(
+      `Failed to get ACCESS_TOKEN for workload identity federation exchange, response: ${response}`
+    );
+  }
+  return access_token;
+}
+
+interface AuthTokenResponse {
+  key: string;
+}
+
+async function generateWIFAuthKey(config: TailscaleConfig): Promise<string> {
+  core.info("generating WIF auth key");
+  const accessToken = await doTokenExchange(config);
+  const authTokenClient = new client.HttpClient("action-setup-tailscale");
+  const reqBody = {
+    keyType: "auth",
+    capabilities: {
+      devices: {
+        create: {
+          reusable: false,
+          ephemeral: true,
+          preauthorized: true,
+          tags: config.tags.split(","),
+        },
+      },
+      expirySeconds: 3600,
+    },
+  };
+
+  const authTokenRes = await authTokenClient.postJson<AuthTokenResponse>(
+    "https://api.tailscale.com/api/v2/tailnet/-/keys",
+    reqBody,
+    {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    }
+  );
+  if (authTokenRes.statusCode !== 200) {
+    throw new Error(
+      `generating auth key failed with status code ${authTokenRes.statusCode}`
+    );
+  }
+  if (!authTokenRes.result?.key) {
+    throw new Error("no auth key in create response");
+  }
+
+  return authTokenRes.result.key;
 }
 
 function parseTimeout(timeout: string): number {
