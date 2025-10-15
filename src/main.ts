@@ -17,9 +17,6 @@ const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
 const cmdTailscaledFullPath = "/usr/local/bin/tailscaled";
 
-const platformWin32 = "win32";
-const platformDarwin = "darwin";
-
 const runnerLinux = "Linux";
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
@@ -58,21 +55,10 @@ type tailscaleStatus = {
 
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
-  const { exitCode, stdout, stderr } = await exec.getExecOutput(
-    cmdTailscale,
-    ["status", "--json"],
-    {
-      silent: true,
-      ignoreReturnCode: true,
-    }
-  );
-  if (exitCode !== 0) {
-    process.stderr.write(stderr);
-    throw new Error(`tailscale status failed with exit code ${exitCode}`);
-  }
-  if (core.isDebug()) {
-    process.stdout.write(stdout);
-  }
+  const { stdout } = await execSilent("get tailscale status", cmdTailscale, [
+    "status",
+    "--json",
+  ]);
   return JSON.parse(stdout);
 }
 
@@ -180,18 +166,24 @@ async function pingHost(host: string): Promise<void> {
       core.debug(`Waiting ${waitTime} milliseconds before pinging`);
       await wait(waitTime);
     }
-    let result = await exec.getExecOutput(
-      cmdTailscale,
-      ["ping", "-c", "1", host],
-      { ignoreReturnCode: true }
-    );
-    if (result.exitCode === 0) {
+    try {
+      let result = await execSilent("ping host", cmdTailscale, [
+        "ping",
+        "-c",
+        "1",
+        host,
+      ]);
       core.info(`✅ Ping host ${host} reachable via direct connection!`);
       return;
-    } else if (result.stderr.includes("direct connection not established")) {
-      // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
-      core.info(`✅ Ping host ${host} reachable via DERP!`);
-      return;
+    } catch (err) {
+      if (
+        err instanceof execError &&
+        err.stderr.includes("direct connection not established")
+      ) {
+        // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
+        core.info(`✅ Ping host ${host} reachable via DERP!`);
+        return;
+      }
     }
     i++;
   }
@@ -254,11 +246,12 @@ async function resolveVersion(
 
   if (version === versionLatest || version === versionUnstable) {
     let path = version === versionUnstable ? versionUnstable : "stable";
-    const { stdout } = await exec.getExecOutput("curl", [
+    let pkg = `https://pkgs.tailscale.com/${path}/?mode=json`;
+    const { stdout } = await execSilent(`curl ${pkg}`, "curl", [
       "-H",
       "user-agent:action-setup-tailscale",
       "-s",
-      `https://pkgs.tailscale.com/${path}/?mode=json`,
+      pkg,
     ]);
     const response = JSON.parse(stdout);
     return response.Version;
@@ -371,7 +364,7 @@ async function installTailscaleLinux(
   // Get SHA256 if not provided
   if (!config.sha256Sum) {
     const shaUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz.sha256`;
-    const { stdout } = await exec.getExecOutput("curl", [
+    const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", [
       "-H",
       "user-agent:action-setup-tailscale",
       "-L",
@@ -415,7 +408,7 @@ async function installTailscaleLinux(
   );
 
   // Install binaries to /usr/local/bin
-  await exec.exec("sudo", [
+  await execSilent("copy tailscale binaries to /usr/local/bin", "sudo", [
     "cp",
     path.join(toolPath, cmdTailscale),
     path.join(toolPath, cmdTailscaled),
@@ -423,8 +416,16 @@ async function installTailscaleLinux(
   ]);
 
   // Make sure they're executable
-  await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
-  await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
+  await execSilent("chmod tailscale binary", "sudo", [
+    "chmod",
+    "+x",
+    cmdTailscaleFullPath,
+  ]);
+  await execSilent("chmod tailscaled binary", "sudo", [
+    "chmod",
+    "+x",
+    cmdTailscaledFullPath,
+  ]);
 }
 
 async function installTailscaleWindows(
@@ -454,7 +455,7 @@ async function installTailscaleWindows(
     // Get SHA256 if not provided
     if (!config.sha256Sum) {
       const shaUrl = `${baseUrl}/tailscale-setup-${config.resolvedVersion}-${config.arch}.msi.sha256`;
-      const { stdout } = await exec.getExecOutput("curl", [
+      const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", [
         "-H",
         "user-agent:action-setup-tailscale",
         "-L",
@@ -487,7 +488,7 @@ async function installTailscaleWindows(
   }
 
   // Install MSI (same for both fresh and cached)
-  await exec.exec("msiexec.exe", [
+  await execSilent("install msi", "msiexec.exe", [
     "/quiet",
     `/l*v`,
     path.join(process.env.RUNNER_TEMP || "", "tailscale.log"),
@@ -506,21 +507,28 @@ async function installTailscaleMacOS(
   core.info("Building tailscale from src on macOS...");
 
   // Clone the repo
-  await exec.exec(
+  await execSilent(
+    "glone tailscale repo",
     "git clone https://github.com/tailscale/tailscale.git tailscale"
   );
 
   // Checkout the resolved version
-  await exec.exec(`git checkout v${config.resolvedVersion}`, [], {
-    cwd: cmdTailscale,
-  });
+  await execSilent(
+    "checkout resolved version",
+    `git checkout v${config.resolvedVersion}`,
+    [],
+    {
+      cwd: cmdTailscale,
+    }
+  );
 
   // Create tool directory and copy binaries there for caching
   fs.mkdirSync(toolPath, { recursive: true });
 
   // Build tailscale and tailscaled into tool directory
   for (const binary of [cmdTailscale, cmdTailscaled]) {
-    await exec.exec(
+    await execSilent(
+      `build ${binary}`,
       `./build_dist.sh -o ${path.join(toolPath, binary)} ./cmd/${binary}`,
       [],
       {
@@ -534,7 +542,7 @@ async function installTailscaleMacOS(
   }
 
   // Install binaries to /usr/local/bin
-  await exec.exec("sudo", [
+  await execSilent("copy binaries to /usr/local/bin", "sudo", [
     "cp",
     path.join(toolPath, cmdTailscale),
     path.join(toolPath, cmdTailscaled),
@@ -542,8 +550,16 @@ async function installTailscaleMacOS(
   ]);
 
   // Make sure they're executable
-  await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
-  await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
+  await execSilent("chmod tailscale", "sudo", [
+    "chmod",
+    "+x",
+    cmdTailscaleFullPath,
+  ]);
+  await execSilent("chmod tailscaled", "sudo", [
+    "chmod",
+    "+x",
+    cmdTailscaledFullPath,
+  ]);
 
   core.info("✅ Tailscale installed successfully on macOS from source");
 }
@@ -632,7 +648,7 @@ async function connectToTailscale(
     if (runnerOS === runnerWindows) {
       hostname = `github-${process.env.COMPUTERNAME}`;
     } else {
-      const { stdout } = await exec.getExecOutput("hostname");
+      const { stdout } = await execSilent("hostname", "hostname");
       hostname = `github-${stdout.trim()}`;
     }
   }
@@ -682,10 +698,8 @@ async function connectToTailscale(
       }
 
       const timeoutMs = parseTimeout(config.timeout);
-      core.info(`Running: ${execArgs.join(" ")} (timeout: ${timeoutMs}ms)`);
-
       await Promise.race([
-        exec.exec(execArgs[0], execArgs.slice(1)),
+        execSilent("tailscale up", execArgs[0], execArgs.slice(1)),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Timeout")), timeoutMs)
         ),
@@ -767,10 +781,26 @@ async function installCachedBinaries(
     const tailscaledBin = path.join(toolPath, cmdTailscaled);
 
     if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
-      await exec.exec("sudo", ["cp", tailscaleBin, cmdTailscaleFullPath]);
-      await exec.exec("sudo", ["cp", tailscaledBin, cmdTailscaledFullPath]);
-      await exec.exec("sudo", ["chmod", "+x", cmdTailscaleFullPath]);
-      await exec.exec("sudo", ["chmod", "+x", cmdTailscaledFullPath]);
+      await execSilent("copy tailscale from cache", "sudo", [
+        "cp",
+        tailscaleBin,
+        cmdTailscaleFullPath,
+      ]);
+      await execSilent("copy tailscaled from cache", "sudo", [
+        "cp",
+        tailscaledBin,
+        cmdTailscaledFullPath,
+      ]);
+      await execSilent("chmod tailscale", "sudo", [
+        "chmod",
+        "+x",
+        cmdTailscaleFullPath,
+      ]);
+      await execSilent("chmod tailscaled", "sudo", [
+        "chmod",
+        "+x",
+        cmdTailscaledFullPath,
+      ]);
     } else {
       throw new Error(`Cached binaries not found in ${toolPath}`);
     }
@@ -787,12 +817,12 @@ async function configureDNSOnMacOS(status: tailscaleStatus): Promise<void> {
     `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`
   );
   try {
-    await exec.exec("networksetup", [
+    await execSilent("set dns servers", "networksetup", [
       "-setdnsservers",
       "Ethernet",
       "100.100.100.100",
     ]);
-    await exec.exec("networksetup", [
+    await execSilent("set search domains", "networksetup", [
       "-setsearchdomains",
       "Ethernet",
       status.CurrentTailnet.MagicDNSSuffix,
@@ -803,3 +833,58 @@ async function configureDNSOnMacOS(status: tailscaleStatus): Promise<void> {
 }
 
 run();
+
+/**
+ * Executes the given command, logging the given label as info, but suppressing
+ * all other output including the command line itself (unless debug logging is enabled,
+ * see https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging).
+ *
+ * If the command fails, stderr is written to the console.
+ *
+ * @param label a label to use for info logging what's happening
+ * @param cmd the command to run
+ * @param args arguments to the command
+ * @returns stdout (if command was successful)
+ * @throws execError if exec returned a non-zero status code
+ */
+async function execSilent(
+  label: string,
+  cmd: string,
+  args?: string[],
+  opts?: {}
+): Promise<exec.ExecOutput> {
+  core.info(`▶️ ${label}`);
+  const out = await exec.getExecOutput(cmd, args, {
+    ...opts,
+    silent: !core.isDebug(),
+    ignoreReturnCode: true,
+  });
+  if (out.exitCode !== 0) {
+    if (!core.isDebug) {
+      // When debug logging is off, stderr won't have been written to console, write it now.
+      process.stderr.write(out.stderr);
+    }
+    throw new execError(
+      `${cmd} failed with exit code ${out.exitCode}`,
+      out.exitCode,
+      out.stderr
+    );
+  }
+  return out;
+}
+
+class execError {
+  msg: string;
+  exitCode: number;
+  stderr: string;
+
+  public constructor(msg: string, exitCode: number, stderr: string) {
+    this.msg = msg;
+    this.exitCode = exitCode;
+    this.stderr = stderr;
+  }
+
+  public toString(): string {
+    return this.msg;
+  }
+}
