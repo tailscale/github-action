@@ -129,3 +129,8 @@ Although caching is generally recommended, you can disable it by passing `'false
     oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
     use-cache: "false"
 ```
+
+## Usage on persistent self-hosted runners
+
+When running on self-hosted runners that persist after CI jobs have finished,
+the GitHub Action leaves tailscale binaries installed but stops the tailscale background processes.

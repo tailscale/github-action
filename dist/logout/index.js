@@ -25686,10 +25686,13 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const exec = __importStar(__nccwpck_require__(5236));
+const fs = __importStar(__nccwpck_require__(9896));
+const runnerWindows = "Windows";
+const runnerMacOS = "macOS";
 async function logout() {
     try {
         const runnerOS = process.env.RUNNER_OS || "";
-        if (runnerOS === "macOS") {
+        if (runnerOS === runnerMacOS) {
             // The below is required to allow GitHub's post job cleanup to complete.
             core.info("Resetting DNS settings on macOS");
             await exec.exec("networksetup", ["-setdnsservers", "Ethernet", "Empty"]);
@@ -25703,29 +25706,50 @@ async function logout() {
         // Check if tailscale is available first
         try {
             await exec.exec("tailscale", ["--version"], { silent: true });
+            // Determine the correct command based on OS
+            let execArgs;
+            if (runnerOS === runnerWindows) {
+                execArgs = ["tailscale", "logout"];
+            }
+            else {
+                // Linux and macOS - use system-installed binary with sudo
+                execArgs = ["sudo", "-E", "tailscale", "logout"];
+            }
+            core.info(`Running: ${execArgs.join(" ")}`);
+            try {
+                await exec.exec(execArgs[0], execArgs.slice(1));
+                core.info("✅ Successfully logged out of Tailscale");
+            }
+            catch (error) {
+                // Don't fail the action if logout fails - it's just cleanup
+                core.warning(`Failed to logout from Tailscale: ${error}`);
+                core.info("Your ephemeral node will eventually be cleaned up by Tailscale");
+            }
         }
         catch (error) {
             core.info("Tailscale not found or not accessible, skipping logout");
             return;
         }
-        // Determine the correct command based on OS
-        let execArgs;
-        if (runnerOS === "Windows") {
-            execArgs = ["tailscale", "logout"];
-        }
-        else {
-            // Linux and macOS - use system-installed binary with sudo
-            execArgs = ["sudo", "-E", "tailscale", "logout"];
-        }
-        core.info(`Running: ${execArgs.join(" ")}`);
+        core.info("Stopping tailscale");
         try {
-            await exec.exec(execArgs[0], execArgs.slice(1));
-            core.info("✅ Successfully logged out of Tailscale");
+            if (runnerOS === runnerWindows) {
+                await exec.exec("net", ["stop", "Tailscale"]);
+                await exec.exec("taskkill", ["/F", "/IM", "tailscale-ipn.exe"]);
+            }
+            else {
+                const pid = fs.readFileSync("tailscaled.pid").toString();
+                if (pid === "") {
+                    throw new Error("pid file empty");
+                }
+                // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
+                await exec.exec("sudo", ["pkill", "-P", pid]);
+                // Clean up DNS and routes.
+                await exec.exec("sudo", ["tailscaled", "--cleanup"]);
+            }
+            core.info("✅ Stopped tailscale");
         }
         catch (error) {
-            // Don't fail the action if logout fails - it's just cleanup
-            core.warning(`Failed to logout from Tailscale: ${error}`);
-            core.info("Your ephemeral node will eventually be cleaned up by Tailscale");
+            core.warning(`Failed to stop tailscale: ${error}`);
         }
     }
     catch (error) {
