@@ -3,6 +3,9 @@
 
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as fs from "fs";
+
+const runnerWindows = "Windows";
 
 async function logout(): Promise<void> {
   try {
@@ -24,31 +27,46 @@ async function logout(): Promise<void> {
     // Check if tailscale is available first
     try {
       await exec.exec("tailscale", ["--version"], { silent: true });
+
+      // Determine the correct command based on OS
+      let execArgs: string[];
+      if (runnerOS === runnerWindows) {
+        execArgs = ["tailscale", "logout"];
+      } else {
+        // Linux and macOS - use system-installed binary with sudo
+        execArgs = ["sudo", "-E", "tailscale", "logout"];
+      }
+
+      core.info(`Running: ${execArgs.join(" ")}`);
+
+      try {
+        await exec.exec(execArgs[0], execArgs.slice(1));
+        core.info("✅ Successfully logged out of Tailscale");
+      } catch (error) {
+        // Don't fail the action if logout fails - it's just cleanup
+        core.warning(`Failed to logout from Tailscale: ${error}`);
+        core.info(
+          "Your ephemeral node will eventually be cleaned up by Tailscale"
+        );
+      }
     } catch (error) {
       core.info("Tailscale not found or not accessible, skipping logout");
       return;
     }
 
-    // Determine the correct command based on OS
-    let execArgs: string[];
-    if (runnerOS === "Windows") {
-      execArgs = ["tailscale", "logout"];
-    } else {
-      // Linux and macOS - use system-installed binary with sudo
-      execArgs = ["sudo", "-E", "tailscale", "logout"];
-    }
-
-    core.info(`Running: ${execArgs.join(" ")}`);
-
-    try {
-      await exec.exec(execArgs[0], execArgs.slice(1));
-      core.info("✅ Successfully logged out of Tailscale");
-    } catch (error) {
-      // Don't fail the action if logout fails - it's just cleanup
-      core.warning(`Failed to logout from Tailscale: ${error}`);
-      core.info(
-        "Your ephemeral node will eventually be cleaned up by Tailscale"
-      );
+    if (runnerOS !== runnerWindows) {
+      try {
+        core.info("Stopping tailscaled");
+        const pid = fs.readFileSync("tailscaled.pid").toString();
+        if (pid === "") {
+          throw new Error("pid file empty");
+        }
+        // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
+        await exec.exec("sudo", ["pkill", "-P", pid]);
+        core.info("✅ Stopped tailscaled");
+      } catch (error) {
+        core.warning(`Failed to stop tailscaled: ${error}`);
+      }
     }
   } catch (error) {
     // Don't fail the action for post-cleanup issues
