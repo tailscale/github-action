@@ -41570,6 +41570,8 @@ async function startTailscaleDaemon(config) {
             fs.openSync(path.join(os.homedir(), "tailscaled.log"), "w"),
         ],
     });
+    // Store PID for cleaning up daemon process in logout.ts.
+    fs.writeFileSync("tailscaled.pid", `${daemon.pid}`);
     daemon.unref(); // Ensure daemon doesn't keep Node.js process alive
     // Close stdin/stdout/stderr to fully detach
     if (daemon.stdin)
