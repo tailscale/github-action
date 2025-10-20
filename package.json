@@ -20,7 +20,7 @@
     "@actions/tool-cache": "^2.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.17.6",
+    "@types/node": "^24.9.0",
     "@vercel/ncc": "^0.38.3",
     "typescript": "^5.8.3",
     "prettier": "^2.5.1",
