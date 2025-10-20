@@ -208,7 +208,7 @@ async function getInputs(): Promise<TailscaleConfig> {
     }
   }
 
-  return {
+  const config = {
     version: core.getInput("version") || "1.88.3",
     resolvedVersion: "",
     arch: "",
@@ -226,6 +226,14 @@ async function getInputs(): Promise<TailscaleConfig> {
     sha256Sum: core.getInput("sha256sum") || "",
     pingHosts: pingHosts,
   };
+
+  if (config.oauthSecret && !config.tags) {
+    throw new Error(
+      "the tags parameter is required when using an OAuth client"
+    );
+  }
+
+  return config;
 }
 
 function validateAuth(config: TailscaleConfig): void {
@@ -665,9 +673,7 @@ async function connectToTailscale(
 
   if (config.oauthSecret) {
     finalAuthKey = `${config.oauthSecret}?preauthorized=true&ephemeral=true`;
-    if (config.tags) {
-      tagsArg.push(`--advertise-tags=${config.tags}`);
-    }
+    tagsArg.push(`--advertise-tags=${config.tags}`);
   }
 
   // Platform-specific args

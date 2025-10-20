@@ -19,7 +19,7 @@ inputs:
     description: 'Your Tailscale OAuth Client Secret.'
     required: false
   tags:
-    description: 'Comma separated list of Tags to be applied to nodes. The OAuth client must have permission to apply these tags.'
+    description: 'Comma separated list of Tags to be applied to nodes. When using an OAuth client, the OAuth client must have the `auth_keys` scope and alls tags on the OAuth client must match all tags specified here.'
     required: false
   version:
     description: 'Tailscale version to use. Specify `latest` to use the latest stable version, and `unstable` to use the latest development version.'

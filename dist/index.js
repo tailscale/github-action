@@ -41264,7 +41264,7 @@ async function getInputs() {
             core.setSecret(oauthSecret);
         }
     }
-    return {
+    const config = {
         version: core.getInput("version") || "1.88.3",
         resolvedVersion: "",
         arch: "",
@@ -41282,6 +41282,10 @@ async function getInputs() {
         sha256Sum: core.getInput("sha256sum") || "",
         pingHosts: pingHosts,
     };
+    if (config.oauthSecret && !config.tags) {
+        throw new Error("the tags parameter is required when using an OAuth client");
+    }
+    return config;
 }
 function validateAuth(config) {
     if (!config.authKey && (!config.oauthSecret || !config.tags)) {
@@ -41628,9 +41632,7 @@ async function connectToTailscale(config, runnerOS) {
     const tagsArg = [];
     if (config.oauthSecret) {
         finalAuthKey = `${config.oauthSecret}?preauthorized=true&ephemeral=true`;
-        if (config.tags) {
-            tagsArg.push(`--advertise-tags=${config.tags}`);
-        }
+        tagsArg.push(`--advertise-tags=${config.tags}`);
     }
     // Platform-specific args
     const platformArgs = [];

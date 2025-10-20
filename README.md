@@ -134,3 +134,9 @@ Although caching is generally recommended, you can disable it by passing `'false
 
 When running on self-hosted runners that persist after CI jobs have finished,
 the GitHub Action leaves tailscale binaries installed but stops the tailscale background processes.
+
+## Troubleshooting
+
+### requested tags [tag:mytag] are invalid or not permitted
+
+You may encounter this error when using an OAuth client. OAuth clients must have the [`auth_keys` scope](https://tailscale.com/kb/1215/oauth-clients#scopes) with one or more [tags](https://tailscale.com/kb/1068/acl-tags/), and the tags specified with `tags` must match all tags on the OAuth client.
