@@ -30,6 +30,7 @@ interface TailscaleConfig {
   arch: string;
   authKey: string;
   oauthClientId: string;
+  audience: string;
   oauthSecret: string;
   tags: string;
   hostname: string;
@@ -214,6 +215,7 @@ async function getInputs(): Promise<TailscaleConfig> {
     arch: "",
     authKey: authKey,
     oauthClientId: core.getInput("oauth-client-id") || "",
+    audience: core.getInput("audience") || "",
     oauthSecret: oauthSecret,
     tags: core.getInput("tags") || "",
     hostname: core.getInput("hostname") || "",
@@ -237,9 +239,13 @@ async function getInputs(): Promise<TailscaleConfig> {
 }
 
 function validateAuth(config: TailscaleConfig): void {
-  if (!config.authKey && (!config.oauthSecret || !config.tags)) {
+  if (
+    !config.authKey &&
+    (!config.oauthSecret || !config.tags) &&
+    (!config.audience || !config.oauthClientId || !config.tags)
+  ) {
     throw new Error(
-      "OAuth identity empty, please provide either an auth key or OAuth secret and tags."
+      "Please provide either an auth key, OAuth secret and tags, or Workload identity federation information with tags "
     );
   }
 }
@@ -668,14 +674,24 @@ async function connectToTailscale(
   hostname = hostname.substring(0, 63);
 
   // Prepare auth and tags
-  let finalAuthKey = config.authKey;
+  const authArgs: string[] = [];
   const tagsArg: string[] = [];
 
-  if (config.oauthSecret) {
-    finalAuthKey = `${config.oauthSecret}?preauthorized=true&ephemeral=true`;
+  if (config.authKey) {
+    authArgs.push(`--authkey=${config.authKey}`);
+  } else {
     tagsArg.push(`--advertise-tags=${config.tags}`);
-  }
 
+    if (config.oauthSecret) {
+      authArgs.push(
+        `--authkey=${config.oauthSecret}?preauthorized=true&ephemeral=true`
+      );
+    } else if (config.audience) {
+      const token = await core.getIDToken(config.audience);
+      authArgs.push(`--client-id=${config.oauthClientId}`);
+      authArgs.push(`--id-token=${token}`);
+    }
+  }
   // Platform-specific args
   const platformArgs: string[] = [];
   if (runnerOS === runnerWindows) {
@@ -686,11 +702,11 @@ async function connectToTailscale(
   const upArgs = [
     "up",
     ...tagsArg,
-    `--authkey=${finalAuthKey}`,
     `--hostname=${hostname}`,
     "--accept-routes",
     ...platformArgs,
     ...config.args.split(" ").filter(Boolean),
+    ...authArgs,
   ];
 
   // Retry logic

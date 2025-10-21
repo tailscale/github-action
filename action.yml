@@ -13,7 +13,10 @@ inputs:
     required: false
     deprecationMessage: 'An OAuth API client https://tailscale.com/s/oauth-clients is recommended instead of an authkey'
   oauth-client-id:
-    description: 'Your Tailscale OAuth Client ID.'
+    description: 'Your Tailscale OAuth or Workload Identity Federation Client ID.'
+    required: false
+  audience:
+    description: 'Your Tailscale Workload Identity Federation Audience'
     required: false
   oauth-secret:
     description: 'Your Tailscale OAuth Client Secret.'
