@@ -1,5 +1,8 @@
 name: "Integration Tests"
 
+permissions:
+  id-token: write # This is required for requesting the JWT for workload identity
+
 on:
   pull_request:
   workflow_dispatch:
@@ -11,7 +14,7 @@ jobs:
   # Matrix test for all supported platforms and architectures
 
   integration-tests:
-    name: ${{ matrix.os }} (${{ matrix.arch }}) tailscale-${{ matrix.version }}
+    name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -22,17 +25,20 @@ jobs:
             arch: amd64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: oauth
 
           # Try unstable too
           - os: ubuntu-latest
             runner-os: Linux
             arch: amd64
             version: unstable
+            credential-type: oauth
 
           # Try a pinned version
           - os: ubuntu-latest
             runner-os: Linux
             arch: amd64
+            credential-type: oauth
             # leave version blank to fall back to default
 
           # Linux tests (ARM64)
@@ -40,6 +46,7 @@ jobs:
             runner-os: Linux
             arch: arm64
             version: latest
+            credential-type: oauth
 
           # Windows tests (AMD64)
           - os: windows-latest
@@ -47,17 +54,14 @@ jobs:
             arch: amd64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-
-          - os: windows-latest
-            runner-os: Windows
-            arch: amd64
-            version: unstable
+            credential-type: oauth
 
           # Windows tests (ARM64)
           - os: windows-11-arm
             runner-os: Windows
             arch: arm64
             version: latest
+            credential-type: oauth
 
           # macOS 13 (AMD64)
           - os: macos-13
@@ -65,6 +69,7 @@ jobs:
             arch: amd64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: oauth
 
           # macOS 14 (ARM)
           - os: macos-14
@@ -72,6 +77,7 @@ jobs:
             arch: arm64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: oauth
 
           # macOS latest (ARM)
           - os: macos-latest
@@ -79,6 +85,30 @@ jobs:
             arch: arm64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: oauth
+
+          # Try workload identity for each platform
+          - os: macos-latest
+            runner-os: macOS
+            arch: amd64
+            version: latest
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: workload-identity
+
+          - os: windows-latest
+            runner-os: Windows
+            arch: amd64
+            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+            credential-type: workload-identity
+            # leave version blank to fall back to default
+
+          # Try adding in an unstable
+          - os: ubuntu-latest
+            runner-os: Linux
+            arch: amd64
+            version: unstable
+            credential-type: workload-identity
+
 
     runs-on: ${{ matrix.os }}
 
@@ -103,8 +133,9 @@ jobs:
         id: tailscale-oauth
         uses: ./
         with:
-          oauth-client-id: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET }}
+          oauth-client-id: ${{ matrix.credential-type == 'oauth' && secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID || secrets.TS_WORKLOAD_IDENTITY_CLIENT_ID }}
+          oauth-secret: ${{ matrix.credential-type == 'oauth' &&  secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET || '' }}
+          audience: ${{ matrix.credential-type == 'workload-identity' && secrets.TS_AUDIENCE || ''}}
           tags: "tag:ci"
           version: "${{ matrix.version }}"
           use-cache: false
