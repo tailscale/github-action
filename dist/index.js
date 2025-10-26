@@ -41306,7 +41306,17 @@ async function resolveVersion(version, runnerOS) {
             pkg,
         ]);
         const response = JSON.parse(stdout);
-        return response.Version;
+        switch (runnerOS) {
+            case runnerLinux:
+                return response.TarballsVersion;
+            case runnerMacOS:
+                // Use latest tag on macOS since we are building from source
+                return response.Version;
+            case runnerWindows:
+                return response.MSIsVersion;
+            default:
+                return response.Version;
+        }
     }
     return version;
 }
