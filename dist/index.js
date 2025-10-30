@@ -41124,6 +41124,7 @@ const crypto = __importStar(__nccwpck_require__(76982));
 const fs = __importStar(__nccwpck_require__(79896));
 const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
+const semver = __importStar(__nccwpck_require__(39318));
 const promises_1 = __nccwpck_require__(16460);
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
@@ -41265,11 +41266,12 @@ async function getInputs() {
         }
     }
     const config = {
-        version: core.getInput("version") || "1.88.3",
+        version: core.getInput("version") || "1.90.4",
         resolvedVersion: "",
         arch: "",
         authKey: authKey,
         oauthClientId: core.getInput("oauth-client-id") || "",
+        audience: core.getInput("audience") || "",
         oauthSecret: oauthSecret,
         tags: core.getInput("tags") || "",
         hostname: core.getInput("hostname") || "",
@@ -41288,8 +41290,15 @@ async function getInputs() {
     return config;
 }
 function validateAuth(config) {
-    if (!config.authKey && (!config.oauthSecret || !config.tags)) {
-        throw new Error("OAuth identity empty, please provide either an auth key or OAuth secret and tags.");
+    if (!config.authKey &&
+        (!config.oauthSecret || !config.tags) &&
+        (!config.audience || !config.oauthClientId || !config.tags)) {
+        throw new Error("Please provide either an auth key, OAuth secret and tags, or federated identity client ID and audience with tags.");
+    }
+    if (config.audience &&
+        semver.valid(config.version) &&
+        semver.gt("1.90.0", config.version)) {
+        throw new Error("Workload identity federation requires using tailscale version 1.90.0 or later.");
     }
 }
 async function resolveVersion(version, runnerOS) {
@@ -41637,12 +41646,29 @@ async function connectToTailscale(config, runnerOS) {
     }
     // Limit hostname to 63 characters (more will result in the error "not a valid DNS label")
     hostname = hostname.substring(0, 63);
-    // Prepare auth and tags
-    let finalAuthKey = config.authKey;
-    const tagsArg = [];
-    if (config.oauthSecret) {
-        finalAuthKey = `${config.oauthSecret}?preauthorized=true&ephemeral=true`;
-        tagsArg.push(`--advertise-tags=${config.tags}`);
+    // Prepare auth and tags.
+    //
+    // Items higher in this list take precedence for auth:
+    // 1. Workload identity
+    // 2. OAuth client
+    // 3. Auth key
+    let authArgs;
+    let tagsArg = [];
+    authArgs = [`--authkey=${config.authKey}`];
+    if (config.audience || config.oauthSecret) {
+        tagsArg = [`--advertise-tags=${config.tags}`];
+        if (config.audience) {
+            const token = await core.getIDToken(config.audience);
+            authArgs = [
+                `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
+                `--id-token=${token}`,
+            ];
+        }
+        else if (config.oauthSecret) {
+            authArgs = [
+                `--authkey=${config.oauthSecret}?preauthorized=true&ephemeral=true`,
+            ];
+        }
     }
     // Platform-specific args
     const platformArgs = [];
@@ -41653,11 +41679,11 @@ async function connectToTailscale(config, runnerOS) {
     const upArgs = [
         "up",
         ...tagsArg,
-        `--authkey=${finalAuthKey}`,
         `--hostname=${hostname}`,
         "--accept-routes",
         ...platformArgs,
         ...config.args.split(" ").filter(Boolean),
+        ...authArgs,
     ];
     // Retry logic
     for (let attempt = 1; attempt <= config.retry; attempt++) {

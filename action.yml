@@ -13,7 +13,10 @@ inputs:
     required: false
     deprecationMessage: 'An OAuth API client https://tailscale.com/s/oauth-clients is recommended instead of an authkey'
   oauth-client-id:
-    description: 'Your Tailscale OAuth Client ID.'
+    description: 'Your Tailscale OAuth or OIDC Federated Identity clientID.'
+    required: false
+  audience:
+    description: 'Your Tailscale OIDC Federated Identity Audience'
     required: false
   oauth-secret:
     description: 'Your Tailscale OAuth Client Secret.'
@@ -24,7 +27,7 @@ inputs:
   version:
     description: 'Tailscale version to use. Specify `latest` to use the latest stable version, and `unstable` to use the latest development version.'
     required: true
-    default: '1.88.3'
+    default: '1.90.4'
   args:
     description: 'Optional additional arguments to `tailscale up`.'
     required: false
@@ -66,4 +69,3 @@ runs:
   using: 'node24'
   main: 'dist/index.js'
   post: 'dist/logout/index.js'
-
