@@ -17,7 +17,7 @@ Subsequent steps in the Action can then access nodes in your Tailnet.
 oauth-client-id and oauth-secret are an [OAuth client][kb-oauth-clients]
 for the tailnet to be accessed. We recommend storing these as
 [GitHub Encrypted Secrets.](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
-OAuth clients used for this purpose must have the
+OAuth clients used for this purpose must have the writable
 [`auth_keys` scope.][kb-trust-credentials-scopes]
 
 tags is a comma-separated list of one or more [Tags][kb-tags]
@@ -49,7 +49,7 @@ permissions:
   id-token: write # This is required for the tailscale action to request a JWT from GitHub
 ```
 
-OIDC federated identity credentials used for this purpose must have the [`auth_keys` scope.][kb-trust-credentials-scopes]
+OIDC federated identity credentials used for this purpose must have the writable [`auth_keys` scope.][kb-trust-credentials-scopes]
 
 tags is a comma-separated list of one or more [Tags][kb-tags]
 for the node. At least one tag is required: a federated identity is not associated
