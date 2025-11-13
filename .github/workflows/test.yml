@@ -27,88 +27,95 @@ jobs:
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
             credential-type: oauth
 
-          # Try unstable too
-          - os: ubuntu-latest
+          # Linux tests (Older Ubuntu)
+          - os: ubuntu-22.04
             runner-os: Linux
             arch: amd64
-            version: unstable
-            credential-type: oauth
-
-          # Try a pinned version
-          - os: ubuntu-latest
-            runner-os: Linux
-            arch: amd64
-            credential-type: oauth
-            # leave version blank to fall back to default
-
-          # Linux tests (ARM64)
-          - os: ubuntu-24.04-arm
-            runner-os: Linux
-            arch: arm64
-            version: latest
-            credential-type: oauth
-
-          # Windows tests (AMD64)
-          - os: windows-latest
-            runner-os: Windows
-            arch: amd64
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
             credential-type: oauth
 
-          # Windows tests (ARM64)
-          - os: windows-11-arm
-            runner-os: Windows
-            arch: arm64
-            version: latest
-            credential-type: oauth
+          # # Try unstable too
+          # - os: ubuntu-latest
+          #   runner-os: Linux
+          #   arch: amd64
+          #   version: unstable
+          #   credential-type: oauth
 
-          # macOS 13 (AMD64)
-          - os: macos-13
-            runner-os: macOS
-            arch: amd64
-            version: latest
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: oauth
+          # # Try a pinned version
+          # - os: ubuntu-latest
+          #   runner-os: Linux
+          #   arch: amd64
+          #   credential-type: oauth
+          #   # leave version blank to fall back to default
 
-          # macOS 14 (ARM)
-          - os: macos-14
-            runner-os: macOS
-            arch: arm64
-            version: latest
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: oauth
+          # # Linux tests (ARM64)
+          # - os: ubuntu-24.04-arm
+          #   runner-os: Linux
+          #   arch: arm64
+          #   version: latest
+          #   credential-type: oauth
 
-          # macOS latest (ARM)
-          - os: macos-latest
-            runner-os: macOS
-            arch: arm64
-            version: latest
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: oauth
+          # # Windows tests (AMD64)
+          # - os: windows-latest
+          #   runner-os: Windows
+          #   arch: amd64
+          #   version: latest
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: oauth
 
-          # Try workload identity for each platform
-          - os: macos-latest
-            runner-os: macOS
-            arch: amd64
-            version: latest
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: workload-identity
+          # # Windows tests (ARM64)
+          # - os: windows-11-arm
+          #   runner-os: Windows
+          #   arch: arm64
+          #   version: latest
+          #   credential-type: oauth
 
-          - os: windows-latest
-            runner-os: Windows
-            arch: amd64
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: workload-identity
-            # leave version blank to fall back to default
+          # # macOS 13 (AMD64)
+          # - os: macos-13
+          #   runner-os: macOS
+          #   arch: amd64
+          #   version: latest
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: oauth
 
-          # Try adding in an unstable
-          - os: ubuntu-latest
-            runner-os: Linux
-            arch: amd64
-            version: unstable
-            credential-type: workload-identity
+          # # macOS 14 (ARM)
+          # - os: macos-14
+          #   runner-os: macOS
+          #   arch: arm64
+          #   version: latest
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: oauth
 
+          # # macOS latest (ARM)
+          # - os: macos-latest
+          #   runner-os: macOS
+          #   arch: arm64
+          #   version: latest
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: oauth
+
+          # # Try workload identity for each platform
+          # - os: macos-latest
+          #   runner-os: macOS
+          #   arch: amd64
+          #   version: latest
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: workload-identity
+
+          # - os: windows-latest
+          #   runner-os: Windows
+          #   arch: amd64
+          #   ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
+          #   credential-type: workload-identity
+          #   # leave version blank to fall back to default
+
+          # # Try adding in an unstable
+          # - os: ubuntu-latest
+          #   runner-os: Linux
+          #   arch: amd64
+          #   version: unstable
+          #   credential-type: workload-identity
 
     runs-on: ${{ matrix.os }}
 
@@ -127,6 +134,11 @@ jobs:
 
       - name: Build Action
         run: npm run build
+
+      - name: list resolver configuration (before)
+        run: ls /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+      - name: check resolver status (before)
+        run: resolvectl status
 
       # Test with OAuth authentication
       - name: Test Action
@@ -149,6 +161,11 @@ jobs:
 
       - name: Look up unqualified name
         run: nslookup lax-pve
+
+      - name: list resolver configuration (after)
+        run: ls /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+      - name: check resolver status (after)
+        run: resolvectl status
 
       # Test Tailscale status command
       - name: Check Tailscale Status
