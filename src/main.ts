@@ -318,6 +318,13 @@ function getTailscaleArch(runnerOS: string): string {
       default:
         return "amd64";
     }
+  } else if (runnerOS === runnerMacOS) {
+    switch (runnerArch) {
+      case "ARM64":
+        return "arm64";
+      default:
+        return "amd64";
+    }
   }
   return "amd64";
 }
