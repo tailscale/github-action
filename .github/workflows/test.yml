@@ -67,14 +67,6 @@ jobs:
             version: latest
             credential-type: oauth
 
-          # macOS 13 (AMD64)
-          - os: macos-13
-            runner-os: macOS
-            arch: amd64
-            version: latest
-            ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
-            credential-type: oauth
-
           # macOS 14 (ARM)
           - os: macos-14
             runner-os: macOS
