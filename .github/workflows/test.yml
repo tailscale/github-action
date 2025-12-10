@@ -14,6 +14,10 @@ jobs:
   # Matrix test for all supported platforms and architectures
 
   integration-tests:
+    # Skip our integration tests if the PR is from a fork. This has the consequence of
+    # disabling these even if the PR is from a forked repo into itself, but given that
+    # these tests are very specific to our internal test environment that is a good thing.
+    if: ${{ !github.event.repository.fork }}
     name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version }}
     strategy:
       fail-fast: false
