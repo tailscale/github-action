@@ -3,6 +3,9 @@
   "version": "4.0.0",
   "description": "Connect your GitHub Action workflow to Tailscale",
   "main": "dist/main.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "build": "ncc build src/main.ts -o dist && ncc build src/logout/logout.ts -o dist/logout"
   },
