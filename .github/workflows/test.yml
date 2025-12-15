@@ -17,7 +17,12 @@ jobs:
     # Skip our integration tests if the PR is from a fork. This has the consequence of
     # disabling these even if the PR is from a forked repo into itself, but given that
     # these tests are very specific to our internal test environment that is a good thing.
-    if: ${{ !github.event.repository.fork }}
+    #
+    # Similarly, skip if this is running from a PR that has been opened by dependabot as
+    # the bot does not have credentials for the integration testing tailnet.
+    # TODO(mpminardi): revisit / remove this if / when we give dependabot a tailnet for
+    # testing with a smaller blast radius.
+    if: ${{ !github.event.repository.fork && github.actor != 'dependabot[bot]' }}
     name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version }}
     strategy:
       fail-fast: false
