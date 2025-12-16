@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - mpminardi/check-with-cache
 
 jobs:
   # Matrix test for all supported platforms and architectures
@@ -139,7 +139,6 @@ jobs:
           audience: ${{ matrix.credential-type == 'workload-identity' && secrets.TS_AUDIENCE || ''}}
           tags: "tag:ci"
           version: "${{ matrix.version }}"
-          use-cache: false
           timeout: "5m"
           retry: 3
           ping: "${{ matrix.ping }}"
