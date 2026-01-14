@@ -509,23 +509,38 @@ async function installTailscaleWindows(
 
     // Download MSI
     const downloadUrl = `${baseUrl}/tailscale-setup-${config.resolvedVersion}-${config.arch}.msi`;
-    core.info(`Downloading ${downloadUrl}`);
-
-    const downloadedMsiPath = await tc.downloadTool(downloadUrl, msiPath);
-
-    // Verify checksum
-    const actualSha = await calculateFileSha256(downloadedMsiPath);
     const expectedSha = config.sha256Sum.trim().toLowerCase();
-    core.info(`Expected sha256: ${expectedSha}`);
-    core.info(`Actual sha256: ${actualSha}`);
-    if (actualSha !== expectedSha) {
-      throw new Error("SHA256 checksum mismatch");
+
+    // Check if MSI already exists with correct checksum (for self-hosted runners)
+    let needsDownload = true;
+    if (fs.existsSync(msiPath)) {
+      const existingSha = await calculateFileSha256(msiPath);
+      if (existingSha === expectedSha) {
+        core.info(`Using existing MSI at ${msiPath} (checksum verified)`);
+        needsDownload = false;
+      } else {
+        core.info(`Existing MSI checksum mismatch, re-downloading`);
+        fs.unlinkSync(msiPath);
+      }
     }
 
-    // Keep the MSI file in toolPath for caching (don't delete it)
-    // The downloadedMsiPath is in temp, but we want to keep it in toolPath
-    if (downloadedMsiPath !== msiPath) {
-      fs.copyFileSync(downloadedMsiPath, msiPath);
+    if (needsDownload) {
+      core.info(`Downloading ${downloadUrl}`);
+      const downloadedMsiPath = await tc.downloadTool(downloadUrl, msiPath);
+
+      // Verify checksum
+      const actualSha = await calculateFileSha256(downloadedMsiPath);
+      core.info(`Expected sha256: ${expectedSha}`);
+      core.info(`Actual sha256: ${actualSha}`);
+      if (actualSha !== expectedSha) {
+        throw new Error("SHA256 checksum mismatch");
+      }
+
+      // Keep the MSI file in toolPath for caching (don't delete it)
+      // The downloadedMsiPath is in temp, but we want to keep it in toolPath
+      if (downloadedMsiPath !== msiPath) {
+        fs.copyFileSync(downloadedMsiPath, msiPath);
+      }
     }
   }
 
