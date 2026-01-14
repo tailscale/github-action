@@ -22,7 +22,7 @@ jobs:
     # the bot does not have credentials for the integration testing tailnet.
     # TODO(mpminardi): revisit / remove this if / when we give dependabot a tailnet for
     # testing with a smaller blast radius.
-    if: ${{ !github.event.repository.fork && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
     name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version }}
     strategy:
       fail-fast: false
