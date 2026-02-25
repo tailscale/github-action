@@ -935,7 +935,7 @@ async function execSilent(
     ignoreReturnCode: true,
   });
   if (out.exitCode !== 0) {
-    if (!core.isDebug) {
+    if (!core.isDebug()) {
       // When debug logging is off, stderr won't have been written to console, write it now.
       process.stderr.write(out.stderr);
     }
