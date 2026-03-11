@@ -25928,6 +25928,8 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const exec = __importStar(__nccwpck_require__(5236));
 const fs = __importStar(__nccwpck_require__(9896));
+const os = __importStar(__nccwpck_require__(857));
+const path = __importStar(__nccwpck_require__(6928));
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
 async function logout() {
@@ -25978,7 +25980,12 @@ async function logout() {
                 await exec.exec("taskkill", ["/F", "/IM", "tailscale-ipn.exe"]);
             }
             else {
-                const pid = fs.readFileSync("tailscaled.pid").toString();
+                const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR ||
+                    process.env.XDG_CACHE_HOME ||
+                    path.join(os.homedir(), ".cache");
+                const pid = fs
+                    .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
+                    .toString();
                 if (pid === "") {
                     throw new Error("pid file empty");
                 }

@@ -4,6 +4,8 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
@@ -61,7 +63,13 @@ async function logout(): Promise<void> {
         await exec.exec("net", ["stop", "Tailscale"]);
         await exec.exec("taskkill", ["/F", "/IM", "tailscale-ipn.exe"]);
       } else {
-        const pid = fs.readFileSync("tailscaled.pid").toString();
+        const xdgRuntimeDir =
+          process.env.XDG_RUNTIME_DIR ||
+          process.env.XDG_CACHE_HOME ||
+          path.join(os.homedir(), ".cache");
+        const pid = fs
+          .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
+          .toString();
         if (pid === "") {
           throw new Error("pid file empty");
         }
