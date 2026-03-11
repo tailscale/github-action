@@ -27,7 +27,7 @@ inputs:
   version:
     description: 'Tailscale version to use. Specify `latest` to use the latest stable version, and `unstable` to use the latest development version.'
     required: true
-    default: '1.90.4'
+    default: '1.94.2'
   args:
     description: 'Optional additional arguments to `tailscale up`.'
     required: false
