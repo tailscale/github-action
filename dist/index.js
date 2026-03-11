@@ -52635,7 +52635,7 @@ async function getInputs() {
         }
     }
     const config = {
-        version: core.getInput("version") || "1.90.4",
+        version: core.getInput("version") || "1.94.2",
         resolvedVersion: "",
         arch: "",
         authKey: authKey,
