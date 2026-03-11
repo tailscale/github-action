@@ -22,6 +22,15 @@ const runnerLinux = "Linux";
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
 
+// XDG base directories with sensible defaults.
+function xdgCacheDir(): string {
+  return process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache");
+}
+
+function xdgRuntimeDir(): string {
+  return process.env.XDG_RUNTIME_DIR || xdgCacheDir();
+}
+
 const versionLatest = "latest";
 const versionUnstable = "unstable";
 
@@ -420,7 +429,9 @@ async function installTailscaleLinux(
   const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
   core.info(`Downloading ${downloadUrl}`);
 
-  const tarPath = await tc.downloadTool(downloadUrl, "tailscale.tgz");
+  const tarDest = path.join(xdgCacheDir(), "tailscale.tgz");
+  fs.mkdirSync(path.dirname(tarDest), { recursive: true });
+  const tarPath = await tc.downloadTool(downloadUrl, tarDest);
 
   // Verify checksum
   const actualSha = await calculateFileSha256(tarPath);
@@ -651,7 +662,9 @@ async function startTailscaleDaemon(config: TailscaleConfig): Promise<void> {
   });
 
   // Store PID for cleaning up daemon process in logout.ts.
-  fs.writeFileSync("tailscaled.pid", `${daemon.pid}`);
+  const pidFile = path.join(xdgRuntimeDir(), "tailscaled.pid");
+  fs.mkdirSync(path.dirname(pidFile), { recursive: true });
+  fs.writeFileSync(pidFile, `${daemon.pid}`);
 
   daemon.unref(); // Ensure daemon doesn't keep Node.js process alive
 
