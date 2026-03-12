@@ -27,7 +27,7 @@
     "@types/node": "^24.10.2",
     "@vercel/ncc": "^0.38.3",
     "typescript": "^5.8.3",
-    "prettier": "^3.7.4",
+    "prettier": "^3.8.1",
     "prettier-plugin-organize-imports": "^4.3.0"
   },
   "overrides": {
