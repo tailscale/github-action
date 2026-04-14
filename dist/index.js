@@ -52524,7 +52524,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
 async function installTailscaleMacOS(config, toolPath) {
     core.info("Building tailscale from src on macOS...");
     // Clone the repo
-    await execSilent("glone tailscale repo", "git clone https://github.com/tailscale/tailscale.git tailscale");
+    await execSilent("clone tailscale repo", "git clone https://github.com/tailscale/tailscale.git tailscale");
     // Checkout the resolved version
     await execSilent("checkout resolved version", `git checkout v${config.resolvedVersion}`, [], {
         cwd: cmdTailscale,

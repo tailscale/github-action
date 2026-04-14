@@ -576,7 +576,7 @@ async function installTailscaleMacOS(
 
   // Clone the repo
   await execSilent(
-    "glone tailscale repo",
+    "clone tailscale repo",
     "git clone https://github.com/tailscale/tailscale.git tailscale",
   );
 
