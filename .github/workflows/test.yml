@@ -110,6 +110,13 @@ jobs:
             version: unstable
             credential-type: workload-identity
 
+          # ubuntu-slim smoke test  
+          - os: ubuntu-slim
+            runner-os: Linux
+            arch: amd64
+            version: latest
+            credential-type: oauth
+
 
     runs-on: ${{ matrix.os }}
 
