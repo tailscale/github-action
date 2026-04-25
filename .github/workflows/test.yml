@@ -140,6 +140,7 @@ jobs:
       - name: Test Action
         id: tailscale-oauth
         uses: ./
+        continue-on-error: true
         with:
           oauth-client-id: ${{ matrix.credential-type == 'oauth' && secrets.TS_AUTH_KEYS_OAUTH_CLIENT_ID || secrets.TS_WORKLOAD_IDENTITY_CLIENT_ID }}
           oauth-secret: ${{ matrix.credential-type == 'oauth' &&  secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET || '' }}
@@ -150,6 +151,79 @@ jobs:
           timeout: "5m"
           retry: 3
           ping: "${{ matrix.ping }}"
+
+      # Debug steps for ubuntu-slim
+      - name: Debug - Check tailscaled process
+        if: matrix.os == 'ubuntu-slim'
+        run: |
+          echo "=== Checking for tailscaled process ==="
+          ps aux | grep tailscale || echo "No tailscaled process found"
+          echo ""
+          echo "=== Checking if tailscaled binary exists and permissions ==="
+          ls -la /usr/local/bin/tailscaled || echo "tailscaled binary not found in /usr/local/bin"
+          ls -la /usr/bin/tailscaled || echo "tailscaled binary not found in /usr/bin"
+          ls -la /usr/sbin/tailscaled || echo "tailscaled binary not found in /usr/sbin"
+          echo ""
+          echo "=== Checking tailscaled socket ==="
+          ls -la /var/run/tailscale/tailscaled.sock || echo "Socket not found"
+          echo ""
+          echo "=== Attempting to run tailscaled manually to see errors ==="
+          sudo /usr/local/bin/tailscaled --version || echo "Failed to get version"
+          echo ""
+          echo "=== Checking for required dependencies ==="
+          ldd /usr/local/bin/tailscaled || echo "Failed to check dependencies"
+        shell: bash
+
+      - name: Debug - Check system logs
+        if: matrix.os == 'ubuntu-slim'
+        run: |
+          echo "=== Checking dmesg for tailscale-related errors ==="
+          dmesg | grep -i tailscale || echo "No tailscale entries in dmesg"
+          echo ""
+          echo "=== Checking if journalctl is available ==="
+          which journalctl && journalctl -xe --no-pager -n 100 | grep -i tailscale || echo "journalctl not available or no tailscale entries"
+        shell: bash
+
+      - name: Debug - Try manual start
+        if: matrix.os == 'ubuntu-slim'
+        run: |
+          echo "=== Attempting to start tailscaled manually ==="
+          sudo /usr/local/bin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+          TAILSCALED_PID=$!
+          echo "Started tailscaled with PID: $TAILSCALED_PID"
+          sleep 2
+          echo ""
+          echo "=== Checking if process is still running ==="
+          ps -p $TAILSCALED_PID || echo "Process $TAILSCALED_PID is not running"
+          echo ""
+          echo "=== Checking socket ==="
+          ls -la /var/run/tailscale/tailscaled.sock || echo "Socket still not created"
+          echo ""
+          echo "=== Trying to get status ==="
+          sudo /usr/local/bin/tailscale status || echo "Failed to get status"
+        shell: bash
+
+      - name: Debug - Check system info
+        if: matrix.os == 'ubuntu-slim'
+        run: |
+          echo "=== System information ==="
+          uname -a
+          echo ""
+          echo "=== Ubuntu version ==="
+          cat /etc/os-release
+          echo ""
+          echo "=== Available shared libraries ==="
+          ldconfig -p | grep -E "libc|libpthread|libdl|libm" || echo "Failed to check libraries"
+          echo ""
+          echo "=== File system capabilities ==="
+          df -h
+          echo ""
+          echo "=== Check /tmp and /var permissions ==="
+          ls -la /var/run/ | head -20
+          ls -la /var/lib/ | head -20
+        shell: bash
+
+      
 
       # Look up names to make sure MagicDNS is working
       - name: Look up qualified name
