@@ -23,7 +23,7 @@ jobs:
     # TODO(mpminardi): revisit / remove this if / when we give dependabot a tailnet for
     # testing with a smaller blast radius.
     if: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
-    name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version }}
+    name: ${{ matrix.os }} (${{ matrix.arch }}) (${{ matrix.credential-type }}) tailscale-${{ matrix.version || 'default' }} ${{ matrix.install-type && format('({0})', matrix.install-type) || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -79,22 +79,23 @@ jobs:
             version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
             credential-type: oauth
+            install-type: source
 
-          # macOS latest (ARM)
+          # macOS latest (ARM), explicitly exercising the Homebrew install path.
           - os: macos-latest
             runner-os: macOS
             arch: arm64
-            version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
             credential-type: oauth
+            install-type: brew
 
           # Try workload identity for each platform
           - os: macos-latest
             runner-os: macOS
             arch: amd64
-            version: latest
             ping: 100.99.0.2,lax-pve.pineapplefish.ts.net,lax-pve
             credential-type: workload-identity
+            install-type: brew
 
           - os: windows-latest
             runner-os: Windows
@@ -109,7 +110,6 @@ jobs:
             arch: amd64
             version: unstable
             credential-type: workload-identity
-
 
     runs-on: ${{ matrix.os }}
 
@@ -129,6 +129,23 @@ jobs:
       - name: Build Action
         run: npm run build
 
+      - name: Resolve Homebrew Tailscale Version
+        id: brew-version
+        if: matrix.install-type == 'brew'
+        shell: bash
+        run: |
+          version="$(brew info --json=v2 --formula tailscale | node -e 'let input = ""; process.stdin.on("data", d => input += d); process.stdin.on("end", () => console.log(JSON.parse(input).formulae[0].versions.stable));')"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Force Source Install Path
+        if: matrix.install-type == 'source'
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/no-brew"
+          printf '#!/usr/bin/env bash\nexit 127\n' > "${RUNNER_TEMP}/no-brew/brew"
+          chmod +x "${RUNNER_TEMP}/no-brew/brew"
+          echo "${RUNNER_TEMP}/no-brew" >> "${GITHUB_PATH}"
+
       # Test with OAuth authentication
       - name: Test Action
         id: tailscale-oauth
@@ -138,11 +155,27 @@ jobs:
           oauth-secret: ${{ matrix.credential-type == 'oauth' &&  secrets.TS_AUTH_KEYS_OAUTH_CLIENT_SECRET || '' }}
           audience: ${{ matrix.credential-type == 'workload-identity' && secrets.TS_AUDIENCE || ''}}
           tags: "tag:ci"
-          version: "${{ matrix.version }}"
+          version: "${{ matrix.install-type == 'brew' && steps.brew-version.outputs.version || matrix.version }}"
           use-cache: false
           timeout: "5m"
           retry: 3
           ping: "${{ matrix.ping }}"
+
+      - name: Verify Explicit Install Type
+        if: matrix.install-type
+        shell: bash
+        run: |
+          if [ "${{ matrix.install-type }}" = "brew" ]; then
+            brew list --formula tailscale
+            sudo brew services list | grep -E '^tailscale[[:space:]]+started'
+          elif [ "${{ matrix.install-type }}" = "source" ]; then
+            if brew --version >/dev/null 2>&1; then
+              echo "brew should have been unavailable for source install test"
+              exit 1
+            fi
+            test -x /usr/local/bin/tailscale
+            test -x /usr/local/bin/tailscaled
+          fi
 
       # Look up names to make sure MagicDNS is working
       - name: Look up qualified name

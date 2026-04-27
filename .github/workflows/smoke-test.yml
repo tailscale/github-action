@@ -30,8 +30,8 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Action
-        run: npm run build
+      - name: Build Action and Run Local Smoke Tests
+        run: npm test
 
       - name: Test Action Loading (No Auth)
         uses: ./

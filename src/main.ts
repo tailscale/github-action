@@ -64,6 +64,8 @@ type tailscaleStatus = {
   CurrentTailnet: tailnetInfo;
 };
 
+type installMethod = "brew" | "cache" | "source";
+
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
   const { stdout } = await execSilent("get tailscale status", cmdTailscale, [
@@ -90,7 +92,7 @@ async function run(): Promise<void> {
       config.useCache
     ) {
       throw new Error(
-        "Caching of unstable releases is not supported on macOS runners",
+        "Caching of unstable releases is not supported on macOS runners"
       );
     }
 
@@ -105,11 +107,11 @@ async function run(): Promise<void> {
     config.arch = getTailscaleArch(runnerOS);
 
     // Install Tailscale
-    await installTailscale(config, runnerOS);
+    const installedWith = await installTailscale(config, runnerOS);
 
     // Start daemon (non-Windows only)
     if (runnerOS !== runnerWindows) {
-      await startTailscaleDaemon(config);
+      await startTailscaleDaemon(config, installedWith);
     }
 
     // Connect to Tailscale
@@ -134,7 +136,7 @@ async function run(): Promise<void> {
       core.warning(`Failed to get Tailscale status: ${err}`);
       if (runnerOS === runnerMacOS) {
         core.setFailed(
-          `❌ Tailscale status is required in order to configure macOS`,
+          `❌ Tailscale status is required in order to configure macOS`
         );
         process.exit(2);
       }
@@ -156,8 +158,8 @@ async function pingHostsIfNecessary(config: TailscaleConfig): Promise<void> {
 
   core.info(
     `Will ping hosts ${config.pingHosts.join(
-      ",",
-    )} up to 3 minutes each (in parallel) in order to check connectivity`,
+      ","
+    )} up to 3 minutes each (in parallel) in order to check connectivity`
   );
   let pings = config.pingHosts.map((host) => pingHost(host));
   for (const ping of pings) {
@@ -241,7 +243,7 @@ async function getInputs(): Promise<TailscaleConfig> {
 
   if (config.oauthSecret && !config.tags) {
     throw new Error(
-      "the tags parameter is required when using an OAuth client",
+      "the tags parameter is required when using an OAuth client"
     );
   }
 
@@ -255,7 +257,7 @@ function validateAuth(config: TailscaleConfig): void {
     (!config.audience || !config.oauthClientId || !config.tags)
   ) {
     throw new Error(
-      "Please provide either an auth key, OAuth secret and tags, or federated identity client ID and audience with tags.",
+      "Please provide either an auth key, OAuth secret and tags, or federated identity client ID and audience with tags."
     );
   }
 
@@ -265,14 +267,14 @@ function validateAuth(config: TailscaleConfig): void {
     semver.gt("1.90.0", config.version)
   ) {
     throw new Error(
-      "Workload identity federation requires using tailscale version 1.90.0 or later.",
+      "Workload identity federation requires using tailscale version 1.90.0 or later."
     );
   }
 }
 
 async function resolveVersion(
   version: string,
-  runnerOS: string,
+  runnerOS: string
 ): Promise<string> {
   if (runnerOS === runnerMacOS && version === versionUnstable) {
     return "main";
@@ -340,8 +342,8 @@ function getTailscaleArch(runnerOS: string): string {
 
 async function installTailscale(
   config: TailscaleConfig,
-  runnerOS: string,
-): Promise<void> {
+  runnerOS: string
+): Promise<installMethod> {
   const cacheKey = generateCacheKey(config, runnerOS);
   const toolPath = getToolPath(config, runnerOS);
 
@@ -350,7 +352,7 @@ async function installTailscale(
     const cacheHit = await cache.restoreCache([toolPath], cacheKey);
     if (cacheHit) {
       core.info(
-        `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`,
+        `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`
       );
 
       // For Windows, install the cached MSI
@@ -360,9 +362,11 @@ async function installTailscale(
         // For Linux/macOS, copy binaries to /usr/local/bin
         await installCachedBinaries(toolPath, runnerOS);
       }
-      return;
+      return "cache";
     }
   }
+
+  let installedWith: installMethod = "source";
 
   // Install fresh if not cached
   if (runnerOS === runnerLinux) {
@@ -370,11 +374,11 @@ async function installTailscale(
   } else if (runnerOS === runnerWindows) {
     await installTailscaleWindows(config, toolPath);
   } else if (runnerOS === runnerMacOS) {
-    await installTailscaleMacOS(config, toolPath);
+    installedWith = await installTailscaleMacOS(config, toolPath);
   }
 
   // Save to cache after installation
-  if (config.useCache && cacheKey) {
+  if (config.useCache && cacheKey && installedWith !== "brew") {
     try {
       await cache.saveCache([toolPath], cacheKey);
       core.info(`Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
@@ -389,6 +393,8 @@ async function installTailscale(
       }
     }
   }
+
+  return installedWith;
 }
 
 async function calculateFileSha256(filePath: string): Promise<string> {
@@ -403,7 +409,7 @@ async function calculateFileSha256(filePath: string): Promise<string> {
 
 async function installTailscaleLinux(
   config: TailscaleConfig,
-  toolPath: string,
+  toolPath: string
 ): Promise<void> {
   // Determine if stable or unstable
   const minor = parseInt(config.resolvedVersion.split(".")[1]);
@@ -446,18 +452,18 @@ async function installTailscaleLinux(
   const extractedPath = await tc.extractTar(tarPath, undefined, "xz");
   const extractedDir = path.join(
     extractedPath,
-    `tailscale_${config.resolvedVersion}_${config.arch}`,
+    `tailscale_${config.resolvedVersion}_${config.arch}`
   );
 
   // Create tool directory and copy binaries there for caching
   fs.mkdirSync(toolPath, { recursive: true });
   fs.copyFileSync(
     path.join(extractedDir, cmdTailscale),
-    path.join(toolPath, cmdTailscale),
+    path.join(toolPath, cmdTailscale)
   );
   fs.copyFileSync(
     path.join(extractedDir, cmdTailscaled),
-    path.join(toolPath, cmdTailscaled),
+    path.join(toolPath, cmdTailscaled)
   );
 
   // Install binaries to /usr/local/bin
@@ -484,7 +490,7 @@ async function installTailscaleLinux(
 async function installTailscaleWindows(
   config: TailscaleConfig,
   toolPath: string,
-  fromCache: boolean = false,
+  fromCache: boolean = false
 ): Promise<void> {
   // Create tool directory
   fs.mkdirSync(toolPath, { recursive: true });
@@ -570,14 +576,87 @@ async function installTailscaleWindows(
 
 async function installTailscaleMacOS(
   config: TailscaleConfig,
-  toolPath: string,
+  toolPath: string
+): Promise<installMethod> {
+  if (!(await isHomebrewAvailable())) {
+    core.notice(
+      "Homebrew not found on macOS runner; installing Tailscale from source."
+    );
+    await installTailscaleFromSourceOnMacOS(config, toolPath);
+    return "source";
+  }
+
+  const formulaVersion = await getHomebrewTailscaleFormulaVersion();
+  if (formulaVersion === undefined) {
+    await installTailscaleFromSourceOnMacOS(config, toolPath);
+    return "source";
+  }
+
+  if (formulaVersion === config.resolvedVersion) {
+    core.info(`Installing Tailscale ${config.resolvedVersion} via Homebrew`);
+    await execSilent("install tailscale via homebrew", "brew", [
+      "install",
+      "--formula",
+      cmdTailscale,
+    ]);
+    return "brew";
+  }
+
+  core.notice(
+    `Homebrew tailscale formula version ${formulaVersion} does not match requested version ${config.resolvedVersion}; installing Tailscale from source.`
+  );
+  await installTailscaleFromSourceOnMacOS(config, toolPath);
+  return "source";
+}
+
+async function isHomebrewAvailable(): Promise<boolean> {
+  const out = await exec.getExecOutput("brew", ["--version"], {
+    silent: true,
+    ignoreReturnCode: true,
+  });
+  return out.exitCode === 0;
+}
+
+async function getHomebrewTailscaleFormulaVersion(): Promise<
+  string | undefined
+> {
+  const out = await exec.getExecOutput(
+    "brew",
+    ["info", "--json=v2", "--formula", cmdTailscale],
+    {
+      silent: true,
+      ignoreReturnCode: true,
+    }
+  );
+
+  if (out.exitCode !== 0) {
+    core.notice(
+      "Unable to inspect Homebrew tailscale formula; installing Tailscale from source."
+    );
+    return undefined;
+  }
+
+  try {
+    const info = JSON.parse(out.stdout);
+    return info?.formulae?.[0]?.versions?.stable;
+  } catch (error) {
+    core.notice(
+      `Unable to parse Homebrew tailscale formula metadata: ${error}; installing Tailscale from source.`
+    );
+    return undefined;
+  }
+}
+
+async function installTailscaleFromSourceOnMacOS(
+  config: TailscaleConfig,
+  toolPath: string
 ): Promise<void> {
   core.info("Building tailscale from src on macOS...");
 
   // Clone the repo
   await execSilent(
     "clone tailscale repo",
-    "git clone https://github.com/tailscale/tailscale.git tailscale",
+    "git clone https://github.com/tailscale/tailscale.git tailscale"
   );
 
   // Checkout the resolved version
@@ -587,7 +666,7 @@ async function installTailscaleMacOS(
     [],
     {
       cwd: cmdTailscale,
-    },
+    }
   );
 
   // Create tool directory and copy binaries there for caching
@@ -605,7 +684,7 @@ async function installTailscaleMacOS(
           ...process.env,
           TS_USE_TOOLCHAIN: "1",
         },
-      },
+      }
     );
   }
 
@@ -632,8 +711,24 @@ async function installTailscaleMacOS(
   core.info("✅ Tailscale installed successfully on macOS from source");
 }
 
-async function startTailscaleDaemon(config: TailscaleConfig): Promise<void> {
+async function startTailscaleDaemon(
+  config: TailscaleConfig,
+  installedWith: installMethod
+): Promise<void> {
   const runnerOS = process.env.RUNNER_OS || "";
+
+  if (runnerOS === runnerMacOS && installedWith === "brew") {
+    core.info("Starting tailscaled daemon with Homebrew services...");
+    await execSilent("start tailscale homebrew service", "sudo", [
+      "brew",
+      "services",
+      "start",
+      cmdTailscale,
+    ]);
+    await waitForDaemonReady();
+    core.info("✅ tailscaled daemon is up and running!");
+    return;
+  }
 
   // Manual daemon start
   const stateArgs = config.stateDir
@@ -693,7 +788,7 @@ async function waitForDaemonReady(): Promise<void> {
       // If we get any valid response from the API, the daemon is ready
       if (status) {
         core.info(
-          `Daemon ready! Initial state: ${status.BackendState || "Unknown"}`,
+          `Daemon ready! Initial state: ${status.BackendState || "Unknown"}`
         );
         return;
       }
@@ -707,13 +802,13 @@ async function waitForDaemonReady(): Promise<void> {
   }
 
   throw new Error(
-    `tailscaled daemon did not become ready within timeout, last error: ${lastErr}`,
+    `tailscaled daemon did not become ready within timeout, last error: ${lastErr}`
   );
 }
 
 async function connectToTailscale(
   config: TailscaleConfig,
-  runnerOS: string,
+  runnerOS: string
 ): Promise<void> {
   // Determine hostname
   let hostname = config.hostname;
@@ -789,13 +884,13 @@ async function connectToTailscale(
       await Promise.race([
         execSilent("tailscale up", execArgs[0], execArgs.slice(1)),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), timeoutMs),
+          setTimeout(() => reject(new Error("Timeout")), timeoutMs)
         ),
       ]);
 
       // Success
       core.info(
-        `✅ Tailscale up command completed successfully on attempt ${attempt}`,
+        `✅ Tailscale up command completed successfully on attempt ${attempt}`
       );
       return;
     } catch (error) {
@@ -836,7 +931,7 @@ function sleep(ms: number): Promise<void> {
 
 function generateCacheKey(
   config: TailscaleConfig,
-  runnerOS: string,
+  runnerOS: string
 ): string | undefined {
   if (!config.useCache) {
     return undefined;
@@ -855,13 +950,13 @@ function getToolPath(config: TailscaleConfig, runnerOS: string): string {
     cacheDirectory,
     cmdTailscale,
     config.resolvedVersion,
-    `${runnerOS}-${config.arch}`,
+    `${runnerOS}-${config.arch}`
   );
 }
 
 async function installCachedBinaries(
   toolPath: string,
-  runnerOS: string,
+  runnerOS: string
 ): Promise<void> {
   if (runnerOS === runnerLinux || runnerOS === runnerMacOS) {
     // Copy cached binaries to /usr/local/bin
@@ -902,7 +997,7 @@ async function configureDNSOnMacOS(status: tailscaleStatus): Promise<void> {
   }
 
   core.info(
-    `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`,
+    `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`
   );
   try {
     await execSilent("set dns servers", "networksetup", [
@@ -939,7 +1034,7 @@ async function execSilent(
   label: string,
   cmd: string,
   args?: string[],
-  opts?: {},
+  opts?: {}
 ): Promise<exec.ExecOutput> {
   core.info(`▶️ ${label}`);
   const out = await exec.getExecOutput(cmd, args, {
@@ -955,7 +1050,7 @@ async function execSilent(
     throw new execError(
       `${cmd} failed with exit code ${out.exitCode}`,
       out.exitCode,
-      out.stderr,
+      out.stderr
     );
   }
   return out;
