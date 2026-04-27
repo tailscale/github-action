@@ -41577,11 +41577,7 @@ async function installTailscaleMacOS(config, toolPath) {
     }
     if (formulaVersion === config.resolvedVersion) {
         core.info(`Installing Tailscale ${config.resolvedVersion} via Homebrew`);
-        await execSilent("install tailscale via homebrew", "brew", [
-            "install",
-            "--formula",
-            cmdTailscale,
-        ]);
+        await installTailscaleWithHomebrew(config.resolvedVersion);
         return "brew";
     }
     core.notice(`Homebrew tailscale formula version ${formulaVersion} does not match requested version ${config.resolvedVersion}; installing Tailscale from source.`);
@@ -41589,17 +41585,30 @@ async function installTailscaleMacOS(config, toolPath) {
     return "source";
 }
 async function isHomebrewAvailable() {
-    const out = await exec.getExecOutput("brew", ["--version"], {
-        silent: true,
-        ignoreReturnCode: true,
-    });
-    return out.exitCode === 0;
+    try {
+        const out = await exec.getExecOutput("brew", ["--version"], {
+            silent: true,
+            ignoreReturnCode: true,
+        });
+        return out.exitCode === 0;
+    }
+    catch (error) {
+        core.debug(`Homebrew availability check failed: ${error}`);
+        return false;
+    }
 }
 async function getHomebrewTailscaleFormulaVersion() {
-    const out = await exec.getExecOutput("brew", ["info", "--json=v2", "--formula", cmdTailscale], {
-        silent: true,
-        ignoreReturnCode: true,
-    });
+    let out;
+    try {
+        out = await exec.getExecOutput("brew", ["info", "--json=v2", "--formula", cmdTailscale], {
+            silent: true,
+            ignoreReturnCode: true,
+        });
+    }
+    catch (error) {
+        core.notice(`Unable to inspect Homebrew tailscale formula metadata: ${error}; installing Tailscale from source.`);
+        return undefined;
+    }
     if (out.exitCode !== 0) {
         core.notice("Unable to inspect Homebrew tailscale formula; installing Tailscale from source.");
         return undefined;
@@ -41610,6 +41619,50 @@ async function getHomebrewTailscaleFormulaVersion() {
     }
     catch (error) {
         core.notice(`Unable to parse Homebrew tailscale formula metadata: ${error}; installing Tailscale from source.`);
+        return undefined;
+    }
+}
+async function installTailscaleWithHomebrew(resolvedVersion) {
+    await execSilent("install tailscale via homebrew", "brew", [
+        "install",
+        "--formula",
+        cmdTailscale,
+    ]);
+    let installedVersion = await getHomebrewInstalledTailscaleVersion();
+    if (installedVersion !== resolvedVersion) {
+        core.info(`Installed Homebrew tailscale version ${installedVersion || "unknown"} does not match requested version ${resolvedVersion}; attempting upgrade.`);
+        await execSilent("upgrade tailscale via homebrew", "brew", [
+            "upgrade",
+            "--formula",
+            cmdTailscale,
+        ]);
+        installedVersion = await getHomebrewInstalledTailscaleVersion();
+    }
+    if (installedVersion !== resolvedVersion) {
+        throw new Error(`Homebrew installed tailscale version ${installedVersion || "unknown"}, expected ${resolvedVersion}`);
+    }
+}
+async function getHomebrewInstalledTailscaleVersion() {
+    let out;
+    try {
+        out = await exec.getExecOutput("brew", ["info", "--json=v2", "--formula", cmdTailscale], {
+            silent: true,
+            ignoreReturnCode: true,
+        });
+    }
+    catch (error) {
+        core.debug(`Unable to inspect installed Homebrew tailscale version: ${error}`);
+        return undefined;
+    }
+    if (out.exitCode !== 0) {
+        return undefined;
+    }
+    try {
+        const info = JSON.parse(out.stdout);
+        return info?.formulae?.[0]?.installed?.[0]?.version;
+    }
+    catch (error) {
+        core.debug(`Unable to parse installed Homebrew tailscale version: ${error}`);
         return undefined;
     }
 }
@@ -41657,8 +41710,7 @@ async function startTailscaleDaemon(config, installedWith) {
     const runnerOS = process.env.RUNNER_OS || "";
     if (runnerOS === runnerMacOS && installedWith === "brew") {
         core.info("Starting tailscaled daemon with Homebrew services...");
-        await execSilent("start tailscale homebrew service", "sudo", [
-            "brew",
+        await execSilent("start tailscale homebrew service", "brew", [
             "services",
             "start",
             cmdTailscale,

@@ -167,7 +167,7 @@ jobs:
         run: |
           if [ "${{ matrix.install-type }}" = "brew" ]; then
             brew list --formula tailscale
-            sudo brew services list | grep -E '^tailscale[[:space:]]+started'
+            brew services list | grep -E '^tailscale[[:space:]]+started'
           elif [ "${{ matrix.install-type }}" = "source" ]; then
             if brew --version >/dev/null 2>&1; then
               echo "brew should have been unavailable for source install test"
