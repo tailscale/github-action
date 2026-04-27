@@ -43,10 +43,13 @@ test("Homebrew-owned installs are not saved to the action cache", () => {
   );
 });
 
-test("Homebrew installs start tailscaled through brew services", () => {
-  assert.match(source, /runnerOS === runnerMacOS && installedWith === "brew"/);
-  assert.match(source, /"brew",\s*\[\s*"services",\s*"start",\s*cmdTailscale/);
-  assert.doesNotMatch(source, /"sudo",\s*\[\s*"brew",\s*"services"/);
+test("Homebrew installs start tailscaled with the manual daemon path", () => {
+  assert.match(
+    source,
+    /Starting Homebrew-installed tailscaled daemon manually/
+  );
+  assert.match(source, /spawn\("sudo", \["-E", cmdTailscaled, \.\.\.args\]/);
+  assert.doesNotMatch(source, /"brew",\s*\[\s*"services",\s*"start"/);
 });
 
 test("bundled action includes the macOS Homebrew smoke path", () => {
@@ -58,5 +61,8 @@ test("bundled action includes the macOS Homebrew smoke path", () => {
     bundled,
     /Installing Tailscale \$\{config\.resolvedVersion\} via Homebrew/
   );
-  assert.match(bundled, /start tailscale homebrew service/);
+  assert.match(
+    bundled,
+    /Starting Homebrew-installed tailscaled daemon manually/
+  );
 });

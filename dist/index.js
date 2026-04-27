@@ -41707,17 +41707,8 @@ async function installTailscaleFromSourceOnMacOS(config, toolPath) {
     core.info("✅ Tailscale installed successfully on macOS from source");
 }
 async function startTailscaleDaemon(config, installedWith) {
-    const runnerOS = process.env.RUNNER_OS || "";
-    if (runnerOS === runnerMacOS && installedWith === "brew") {
-        core.info("Starting tailscaled daemon with Homebrew services...");
-        await execSilent("start tailscale homebrew service", "brew", [
-            "services",
-            "start",
-            cmdTailscale,
-        ]);
-        await waitForDaemonReady();
-        core.info("✅ tailscaled daemon is up and running!");
-        return;
+    if (installedWith === "brew") {
+        core.info("Starting Homebrew-installed tailscaled daemon manually...");
     }
     // Manual daemon start
     const stateArgs = config.stateDir
