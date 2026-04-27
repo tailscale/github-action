@@ -49,7 +49,7 @@ async function logout(): Promise<void> {
         // Don't fail the action if logout fails - it's just cleanup
         core.warning(`Failed to logout from Tailscale: ${error}`);
         core.info(
-          "Your ephemeral node will eventually be cleaned up by Tailscale"
+          "Your ephemeral node will eventually be cleaned up by Tailscale",
         );
       }
     } catch (error) {
