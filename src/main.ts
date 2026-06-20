@@ -315,6 +315,8 @@ function getTailscaleArch(runnerOS: string): string {
         return "arm";
       case "X86":
         return "386";
+      case "RISCV64":
+        return "riscv64";
       default:
         return "amd64";
     }
