@@ -64,6 +64,8 @@ type tailscaleStatus = {
   CurrentTailnet: tailnetInfo;
 };
 
+type installMethod = "brew" | "cache" | "source";
+
 // Cross-platform Tailscale local API status check
 async function getTailscaleStatus(): Promise<tailscaleStatus> {
   const { stdout } = await execSilent("get tailscale status", cmdTailscale, [
@@ -105,11 +107,11 @@ async function run(): Promise<void> {
     config.arch = getTailscaleArch(runnerOS);
 
     // Install Tailscale
-    await installTailscale(config, runnerOS);
+    const installedWith = await installTailscale(config, runnerOS);
 
     // Start daemon (non-Windows only)
     if (runnerOS !== runnerWindows) {
-      await startTailscaleDaemon(config);
+      await startTailscaleDaemon(config, installedWith);
     }
 
     // Connect to Tailscale
@@ -343,7 +345,7 @@ function getTailscaleArch(runnerOS: string): string {
 async function installTailscale(
   config: TailscaleConfig,
   runnerOS: string,
-): Promise<void> {
+): Promise<installMethod> {
   const cacheKey = generateCacheKey(config, runnerOS);
   const toolPath = getToolPath(config, runnerOS);
 
@@ -362,9 +364,11 @@ async function installTailscale(
         // For Linux/macOS, copy binaries to /usr/local/bin
         await installCachedBinaries(toolPath, runnerOS);
       }
-      return;
+      return "cache";
     }
   }
+
+  let installedWith: installMethod = "source";
 
   // Install fresh if not cached
   if (runnerOS === runnerLinux) {
@@ -372,11 +376,11 @@ async function installTailscale(
   } else if (runnerOS === runnerWindows) {
     await installTailscaleWindows(config, toolPath);
   } else if (runnerOS === runnerMacOS) {
-    await installTailscaleMacOS(config, toolPath);
+    installedWith = await installTailscaleMacOS(config, toolPath);
   }
 
   // Save to cache after installation
-  if (config.useCache && cacheKey) {
+  if (config.useCache && cacheKey && installedWith !== "brew") {
     try {
       await cache.saveCache([toolPath], cacheKey);
       core.info(`Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
@@ -391,6 +395,8 @@ async function installTailscale(
       }
     }
   }
+
+  return installedWith;
 }
 
 async function calculateFileSha256(filePath: string): Promise<string> {
@@ -573,6 +579,156 @@ async function installTailscaleWindows(
 async function installTailscaleMacOS(
   config: TailscaleConfig,
   toolPath: string,
+): Promise<installMethod> {
+  if (!(await isHomebrewAvailable())) {
+    core.notice(
+      "Homebrew not found on macOS runner; installing Tailscale from source.",
+    );
+    await installTailscaleFromSourceOnMacOS(config, toolPath);
+    return "source";
+  }
+
+  const formulaVersion = await getHomebrewTailscaleFormulaVersion();
+  if (formulaVersion === undefined) {
+    await installTailscaleFromSourceOnMacOS(config, toolPath);
+    return "source";
+  }
+
+  if (formulaVersion === config.resolvedVersion) {
+    core.info(`Installing Tailscale ${config.resolvedVersion} via Homebrew`);
+    await installTailscaleWithHomebrew(config.resolvedVersion);
+    return "brew";
+  }
+
+  core.notice(
+    `Homebrew tailscale formula version ${formulaVersion} does not match requested version ${config.resolvedVersion}; installing Tailscale from source.`,
+  );
+  await installTailscaleFromSourceOnMacOS(config, toolPath);
+  return "source";
+}
+
+async function isHomebrewAvailable(): Promise<boolean> {
+  try {
+    const out = await exec.getExecOutput("brew", ["--version"], {
+      silent: true,
+      ignoreReturnCode: true,
+    });
+    return out.exitCode === 0;
+  } catch (error) {
+    core.debug(`Homebrew availability check failed: ${error}`);
+    return false;
+  }
+}
+
+async function getHomebrewTailscaleFormulaVersion(): Promise<
+  string | undefined
+> {
+  let out: exec.ExecOutput;
+  try {
+    out = await exec.getExecOutput(
+      "brew",
+      ["info", "--json=v2", "--formula", cmdTailscale],
+      {
+        silent: true,
+        ignoreReturnCode: true,
+      },
+    );
+  } catch (error) {
+    core.notice(
+      `Unable to inspect Homebrew tailscale formula metadata: ${error}; installing Tailscale from source.`,
+    );
+    return undefined;
+  }
+
+  if (out.exitCode !== 0) {
+    core.notice(
+      "Unable to inspect Homebrew tailscale formula; installing Tailscale from source.",
+    );
+    return undefined;
+  }
+
+  try {
+    const info = JSON.parse(out.stdout);
+    return info?.formulae?.[0]?.versions?.stable;
+  } catch (error) {
+    core.notice(
+      `Unable to parse Homebrew tailscale formula metadata: ${error}; installing Tailscale from source.`,
+    );
+    return undefined;
+  }
+}
+
+async function installTailscaleWithHomebrew(
+  resolvedVersion: string,
+): Promise<void> {
+  await execSilent("install tailscale via homebrew", "brew", [
+    "install",
+    "--formula",
+    cmdTailscale,
+  ]);
+
+  let installedVersion = await getHomebrewInstalledTailscaleVersion();
+  if (installedVersion !== resolvedVersion) {
+    core.info(
+      `Installed Homebrew tailscale version ${
+        installedVersion || "unknown"
+      } does not match requested version ${resolvedVersion}; attempting upgrade.`,
+    );
+    await execSilent("upgrade tailscale via homebrew", "brew", [
+      "upgrade",
+      "--formula",
+      cmdTailscale,
+    ]);
+    installedVersion = await getHomebrewInstalledTailscaleVersion();
+  }
+
+  if (installedVersion !== resolvedVersion) {
+    throw new Error(
+      `Homebrew installed tailscale version ${
+        installedVersion || "unknown"
+      }, expected ${resolvedVersion}`,
+    );
+  }
+}
+
+async function getHomebrewInstalledTailscaleVersion(): Promise<
+  string | undefined
+> {
+  let out: exec.ExecOutput;
+  try {
+    out = await exec.getExecOutput(
+      "brew",
+      ["info", "--json=v2", "--formula", cmdTailscale],
+      {
+        silent: true,
+        ignoreReturnCode: true,
+      },
+    );
+  } catch (error) {
+    core.debug(
+      `Unable to inspect installed Homebrew tailscale version: ${error}`,
+    );
+    return undefined;
+  }
+
+  if (out.exitCode !== 0) {
+    return undefined;
+  }
+
+  try {
+    const info = JSON.parse(out.stdout);
+    return info?.formulae?.[0]?.installed?.[0]?.version;
+  } catch (error) {
+    core.debug(
+      `Unable to parse installed Homebrew tailscale version: ${error}`,
+    );
+    return undefined;
+  }
+}
+
+async function installTailscaleFromSourceOnMacOS(
+  config: TailscaleConfig,
+  toolPath: string,
 ): Promise<void> {
   core.info("Building tailscale from src on macOS...");
 
@@ -634,8 +790,13 @@ async function installTailscaleMacOS(
   core.info("✅ Tailscale installed successfully on macOS from source");
 }
 
-async function startTailscaleDaemon(config: TailscaleConfig): Promise<void> {
-  const runnerOS = process.env.RUNNER_OS || "";
+async function startTailscaleDaemon(
+  config: TailscaleConfig,
+  installedWith: installMethod,
+): Promise<void> {
+  if (installedWith === "brew") {
+    core.info("Starting Homebrew-installed tailscaled daemon manually...");
+  }
 
   // Manual daemon start
   const stateArgs = config.stateDir
