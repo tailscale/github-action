@@ -133,13 +133,9 @@ async function run(): Promise<void> {
       });
     }
 
-    await withLogGroup(
-      config.logMode,
-      "Connecting to Tailscale",
-      async () => {
-        await connectToTailscale(config, runnerOS);
-      },
-    );
+    await withLogGroup(config.logMode, "Connecting to Tailscale", async () => {
+      await connectToTailscale(config, runnerOS);
+    });
 
     let shouldPingHosts = false;
     await withLogGroup(
@@ -196,9 +192,7 @@ async function pingHostsIfNecessary(config: TailscaleConfig): Promise<void> {
         ",",
       )} up to 3 minutes each (in parallel) in order to check connectivity`,
     );
-    let pings = config.pingHosts.map((host) =>
-      pingHost(host, config.logMode),
-    );
+    let pings = config.pingHosts.map((host) => pingHost(host, config.logMode));
     for (const ping of pings) {
       await ping;
     }
@@ -221,10 +215,7 @@ async function pingHost(host: string, logMode: LogMode): Promise<void> {
       await execSilent("ping host", cmdTailscale, ["ping", "-c", "1", host], {
         logMode,
       });
-      logInfo(
-        logMode,
-        `✅ Ping host ${host} reachable via direct connection!`,
-      );
+      logInfo(logMode, `✅ Ping host ${host} reachable via direct connection!`);
       return;
     } catch (err) {
       if (
@@ -243,11 +234,7 @@ async function pingHost(host: string, logMode: LogMode): Promise<void> {
 
 function getLogMode(): LogMode {
   const logMode = core.getInput("log-mode") || "grouped";
-  if (
-    logMode !== "grouped" &&
-    logMode !== "normal" &&
-    logMode !== "quiet"
-  ) {
+  if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
     throw new Error(
       `Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`,
     );
