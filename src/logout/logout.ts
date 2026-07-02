@@ -10,82 +10,150 @@ import * as path from "path";
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
 
+type LogMode = "grouped" | "normal" | "quiet";
+
 async function logout(): Promise<void> {
   try {
     const runnerOS = process.env.RUNNER_OS || "";
+    const logMode = getLogMode();
 
-    if (runnerOS === runnerMacOS) {
-      // The below is required to allow GitHub's post job cleanup to complete.
-      core.info("Resetting DNS settings on macOS");
-      await exec.exec("networksetup", ["-setdnsservers", "Ethernet", "Empty"]);
-      await exec.exec("networksetup", [
-        "-setsearchdomains",
-        "Ethernet",
-        "Empty",
-      ]);
-    }
-
-    core.info("🔄 Logging out of Tailscale...");
-
-    // Check if tailscale is available first
-    try {
-      await exec.exec("tailscale", ["--version"], { silent: true });
-
-      // Determine the correct command based on OS
-      let execArgs: string[];
-      if (runnerOS === runnerWindows) {
-        execArgs = ["tailscale", "logout"];
-      } else {
-        // Linux and macOS - use system-installed binary with sudo
-        execArgs = ["sudo", "-E", "tailscale", "logout"];
+    await withLogGroup(logMode, "Cleaning up Tailscale", async () => {
+      if (runnerOS === runnerMacOS) {
+        // The below is required to allow GitHub's post job cleanup to complete.
+        logInfo(logMode, "Resetting DNS settings on macOS");
+        await execCommand(logMode, "networksetup", [
+          "-setdnsservers",
+          "Ethernet",
+          "Empty",
+        ]);
+        await execCommand(logMode, "networksetup", [
+          "-setsearchdomains",
+          "Ethernet",
+          "Empty",
+        ]);
       }
 
-      core.info(`Running: ${execArgs.join(" ")}`);
+      logInfo(logMode, "🔄 Logging out of Tailscale...");
 
+      // Check if tailscale is available first
       try {
-        await exec.exec(execArgs[0], execArgs.slice(1));
-        core.info("✅ Successfully logged out of Tailscale");
-      } catch (error) {
-        // Don't fail the action if logout fails - it's just cleanup
-        core.warning(`Failed to logout from Tailscale: ${error}`);
-        core.info(
-          "Your ephemeral node will eventually be cleaned up by Tailscale",
-        );
-      }
-    } catch (error) {
-      core.info("Tailscale not found or not accessible, skipping logout");
-      return;
-    }
+        await execCommand(logMode, "tailscale", ["--version"], {
+          silent: true,
+        });
 
-    core.info("Stopping tailscale");
-    try {
-      if (runnerOS === runnerWindows) {
-        await exec.exec("net", ["stop", "Tailscale"]);
-        await exec.exec("taskkill", ["/F", "/IM", "tailscale-ipn.exe"]);
-      } else {
-        const xdgRuntimeDir =
-          process.env.XDG_RUNTIME_DIR ||
-          process.env.XDG_CACHE_HOME ||
-          path.join(os.homedir(), ".cache");
-        const pid = fs
-          .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
-          .toString();
-        if (pid === "") {
-          throw new Error("pid file empty");
+        // Determine the correct command based on OS
+        let execArgs: string[];
+        if (runnerOS === runnerWindows) {
+          execArgs = ["tailscale", "logout"];
+        } else {
+          // Linux and macOS - use system-installed binary with sudo
+          execArgs = ["sudo", "-E", "tailscale", "logout"];
         }
-        // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
-        await exec.exec("sudo", ["pkill", "-P", pid]);
-        // Clean up DNS and routes.
-        await exec.exec("sudo", ["tailscaled", "--cleanup"]);
+
+        logInfo(logMode, `Running: ${execArgs.join(" ")}`);
+
+        try {
+          await execCommand(logMode, execArgs[0], execArgs.slice(1));
+          logInfo(logMode, "✅ Successfully logged out of Tailscale");
+        } catch (error) {
+          // Don't fail the action if logout fails - it's just cleanup
+          core.warning(`Failed to logout from Tailscale: ${error}`);
+          logInfo(
+            logMode,
+            "Your ephemeral node will eventually be cleaned up by Tailscale",
+          );
+        }
+      } catch (error) {
+        logInfo(
+          logMode,
+          "Tailscale not found or not accessible, skipping logout",
+        );
+        return;
       }
-      core.info("✅ Stopped tailscale");
-    } catch (error) {
-      core.warning(`Failed to stop tailscale: ${error}`);
-    }
+
+      logInfo(logMode, "Stopping tailscale");
+      try {
+        if (runnerOS === runnerWindows) {
+          await execCommand(logMode, "net", ["stop", "Tailscale"]);
+          await execCommand(logMode, "taskkill", [
+            "/F",
+            "/IM",
+            "tailscale-ipn.exe",
+          ]);
+        } else {
+          const xdgRuntimeDir =
+            process.env.XDG_RUNTIME_DIR ||
+            process.env.XDG_CACHE_HOME ||
+            path.join(os.homedir(), ".cache");
+          const pid = fs
+            .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
+            .toString();
+          if (pid === "") {
+            throw new Error("pid file empty");
+          }
+          // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
+          await execCommand(logMode, "sudo", ["pkill", "-P", pid]);
+          // Clean up DNS and routes.
+          await execCommand(logMode, "sudo", ["tailscaled", "--cleanup"]);
+        }
+        logInfo(logMode, "✅ Stopped tailscale");
+      } catch (error) {
+        core.warning(`Failed to stop tailscale: ${error}`);
+      }
+    });
   } catch (error) {
     // Don't fail the action for post-cleanup issues
     core.warning(`Post-action cleanup error: ${error}`);
   }
+}
+
+function getLogMode(): LogMode {
+  const logMode = core.getInput("log-mode") || "grouped";
+  if (
+    logMode !== "grouped" &&
+    logMode !== "normal" &&
+    logMode !== "quiet"
+  ) {
+    throw new Error(
+      `Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`,
+    );
+  }
+  return logMode;
+}
+
+function logInfo(logMode: LogMode, message: string): void {
+  if (logMode !== "quiet") {
+    core.info(message);
+  }
+}
+
+async function withLogGroup<T>(
+  logMode: LogMode,
+  name: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (logMode !== "grouped") {
+    return fn();
+  }
+
+  core.startGroup(name);
+  try {
+    return await fn();
+  } finally {
+    core.endGroup();
+  }
+}
+
+async function execCommand(
+  logMode: LogMode,
+  commandLine: string,
+  args?: string[],
+  options?: exec.ExecOptions,
+): Promise<number> {
+  return exec.exec(commandLine, args, {
+    ...options,
+    silent: options?.silent || logMode === "quiet",
+  });
 }
 
 // Run the logout function
