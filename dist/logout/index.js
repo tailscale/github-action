@@ -26031,9 +26031,7 @@ async function logout() {
 }
 function getLogMode() {
     const logMode = core.getInput("log-mode") || "grouped";
-    if (logMode !== "grouped" &&
-        logMode !== "normal" &&
-        logMode !== "quiet") {
+    if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
         throw new Error(`Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`);
     }
     return logMode;
