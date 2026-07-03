@@ -146,10 +146,19 @@ async function execCommand(
   args?: string[],
   options?: exec.ExecOptions,
 ): Promise<number> {
-  return exec.exec(commandLine, args, {
+  const silent = options?.silent || logMode === "quiet";
+  const out = await exec.getExecOutput(commandLine, args, {
     ...options,
-    silent: options?.silent || logMode === "quiet",
+    silent,
+    ignoreReturnCode: true,
   });
+  if (out.exitCode !== 0) {
+    if (silent) {
+      process.stderr.write(out.stderr);
+    }
+    throw new Error(`${commandLine} failed with exit code ${out.exitCode}`);
+  }
+  return out.exitCode;
 }
 
 // Run the logout function

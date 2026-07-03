@@ -26054,10 +26054,19 @@ async function withLogGroup(logMode, name, fn) {
     }
 }
 async function execCommand(logMode, commandLine, args, options) {
-    return exec.exec(commandLine, args, {
+    const silent = options?.silent || logMode === "quiet";
+    const out = await exec.getExecOutput(commandLine, args, {
         ...options,
-        silent: options?.silent || logMode === "quiet",
+        silent,
+        ignoreReturnCode: true,
     });
+    if (out.exitCode !== 0) {
+        if (silent) {
+            process.stderr.write(out.stderr);
+        }
+        throw new Error(`${commandLine} failed with exit code ${out.exitCode}`);
+    }
+    return out.exitCode;
 }
 // Run the logout function
 logout().catch((error) => {

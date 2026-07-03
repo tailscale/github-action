@@ -897,14 +897,24 @@ async function connectToTailscale(
       }
 
       const timeoutMs = parseTimeout(config.timeout);
-      await Promise.race([
-        execSilent("tailscale up", execArgs[0], execArgs.slice(1), {
-          logMode: config.logMode,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), timeoutMs),
-        ),
-      ]);
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          execSilent("tailscale up", execArgs[0], execArgs.slice(1), {
+            logMode: config.logMode,
+          }),
+          new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(
+              () => reject(new Error("Timeout")),
+              timeoutMs,
+            );
+          }),
+        ]);
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+      }
 
       // Success
       logInfo(

@@ -52696,12 +52696,22 @@ async function connectToTailscale(config, runnerOS) {
                 execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
-            await Promise.race([
-                execSilent("tailscale up", execArgs[0], execArgs.slice(1), {
-                    logMode: config.logMode,
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
-            ]);
+            let timeoutHandle;
+            try {
+                await Promise.race([
+                    execSilent("tailscale up", execArgs[0], execArgs.slice(1), {
+                        logMode: config.logMode,
+                    }),
+                    new Promise((_, reject) => {
+                        timeoutHandle = setTimeout(() => reject(new Error("Timeout")), timeoutMs);
+                    }),
+                ]);
+            }
+            finally {
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                }
+            }
             // Success
             logInfo(config.logMode, `✅ Tailscale up command completed successfully on attempt ${attempt}`);
             return;
