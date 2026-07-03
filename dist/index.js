@@ -52033,6 +52033,119 @@ module.exports = {
 
 /***/ }),
 
+/***/ 91338:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExecError = void 0;
+exports.getLogMode = getLogMode;
+exports.logInfo = logInfo;
+exports.logDebug = logDebug;
+exports.withLogGroup = withLogGroup;
+exports.execCommand = execCommand;
+const core = __importStar(__nccwpck_require__(37484));
+const exec = __importStar(__nccwpck_require__(95236));
+const process = __importStar(__nccwpck_require__(932));
+class ExecError {
+    constructor(msg, exitCode, stderr) {
+        this.msg = msg;
+        this.exitCode = exitCode;
+        this.stderr = stderr;
+    }
+    toString() {
+        return this.msg;
+    }
+}
+exports.ExecError = ExecError;
+function getLogMode() {
+    const logMode = core.getInput("log-mode") || "grouped";
+    if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
+        throw new Error(`Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`);
+    }
+    return logMode;
+}
+function logInfo(logMode, message) {
+    if (logMode !== "quiet") {
+        core.info(message);
+    }
+}
+function logDebug(logMode, message) {
+    if (logMode !== "quiet") {
+        core.debug(message);
+    }
+}
+async function withLogGroup(logMode, name, fn) {
+    if (logMode !== "grouped") {
+        return fn();
+    }
+    core.startGroup(name);
+    try {
+        return await fn();
+    }
+    finally {
+        core.endGroup();
+    }
+}
+async function execCommand(commandLine, args, opts) {
+    const { label, logMode = "normal", ...execOpts } = opts || {};
+    if (label) {
+        logInfo(logMode, `▶️ ${label}`);
+    }
+    const silent = execOpts.silent || logMode === "quiet" || !core.isDebug();
+    const out = await exec.getExecOutput(commandLine, args, {
+        ...execOpts,
+        silent,
+        ignoreReturnCode: true,
+    });
+    if (out.exitCode !== 0) {
+        if (silent) {
+            process.stderr.write(out.stderr);
+        }
+        throw new ExecError(`${commandLine} failed with exit code ${out.exitCode}`, out.exitCode, out.stderr);
+    }
+    return out;
+}
+
+
+/***/ }),
+
 /***/ 41730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -52076,7 +52189,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
-const exec = __importStar(__nccwpck_require__(95236));
 const tc = __importStar(__nccwpck_require__(33472));
 const child_process_1 = __nccwpck_require__(35317);
 const crypto = __importStar(__nccwpck_require__(76982));
@@ -52085,6 +52197,7 @@ const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
 const semver = __importStar(__nccwpck_require__(62088));
 const promises_1 = __nccwpck_require__(16460);
+const logging_1 = __nccwpck_require__(91338);
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
@@ -52102,11 +52215,8 @@ function xdgRuntimeDir() {
 const versionLatest = "latest";
 const versionUnstable = "unstable";
 // Cross-platform Tailscale local API status check
-async function getTailscaleStatus() {
-    const { stdout } = await execSilent("get tailscale status", cmdTailscale, [
-        "status",
-        "--json",
-    ]);
+async function getTailscaleStatus(logMode = "normal") {
+    const { stdout } = await execSilent("get tailscale status", cmdTailscale, ["status", "--json"], { logMode });
     return JSON.parse(stdout);
 }
 async function run() {
@@ -52125,47 +52235,53 @@ async function run() {
         }
         // Validate authentication
         validateAuth(config);
-        // Resolve version
-        config.resolvedVersion = await resolveVersion(config.version, runnerOS);
-        core.info(`Resolved Tailscale version: ${config.resolvedVersion}`);
+        await (0, logging_1.withLogGroup)(config.logMode, "Resolving Tailscale version", async () => {
+            config.resolvedVersion = await resolveVersion(config.version, runnerOS, config.logMode);
+            (0, logging_1.logInfo)(config.logMode, `Resolved Tailscale version: ${config.resolvedVersion}`);
+        });
         // Set architecture
         config.arch = getTailscaleArch(runnerOS);
-        // Install Tailscale
-        await installTailscale(config, runnerOS);
-        // Start daemon (non-Windows only)
+        await (0, logging_1.withLogGroup)(config.logMode, "Installing Tailscale", async () => {
+            await installTailscale(config, runnerOS);
+        });
         if (runnerOS !== runnerWindows) {
-            await startTailscaleDaemon(config);
+            await (0, logging_1.withLogGroup)(config.logMode, "Starting tailscaled", async () => {
+                await startTailscaleDaemon(config);
+            });
         }
-        // Connect to Tailscale
-        await connectToTailscale(config, runnerOS);
-        // Check Tailscale status (cross-platform)
-        try {
-            const status = await getTailscaleStatus();
-            if (status.BackendState === "Running") {
-                core.info("✅ Tailscale is running and connected!");
-                if (runnerOS === runnerMacOS) {
-                    await configureDNSOnMacOS(status);
+        await (0, logging_1.withLogGroup)(config.logMode, "Connecting to Tailscale", async () => {
+            await connectToTailscale(config, runnerOS);
+        });
+        let shouldPingHosts = false;
+        await (0, logging_1.withLogGroup)(config.logMode, "Checking Tailscale status", async () => {
+            try {
+                const status = await getTailscaleStatus(config.logMode);
+                if (status.BackendState === "Running") {
+                    (0, logging_1.logInfo)(config.logMode, "✅ Tailscale is running and connected!");
+                    if (runnerOS === runnerMacOS) {
+                        await configureDNSOnMacOS(status, config.logMode);
+                    }
+                    shouldPingHosts = true;
                 }
-                await pingHostsIfNecessary(config);
-                // Explicitly exit to prevent hanging
-                process.exit(0);
+                else {
+                    core.setFailed(`❌ Tailscale backend state: ${status.BackendState}`);
+                    process.exitCode = 1;
+                }
             }
-            else {
-                core.setFailed(`❌ Tailscale backend state: ${status.BackendState}`);
-                process.exit(1);
+            catch (err) {
+                core.warning(`Failed to get Tailscale status: ${err}`);
+                if (runnerOS === runnerMacOS) {
+                    core.setFailed(`❌ Tailscale status is required in order to configure macOS`);
+                    process.exitCode = 2;
+                    return;
+                }
+                // Still exit successfully since the main connection worked
+                (0, logging_1.logInfo)(config.logMode, "✅ Tailscale daemon is connected!");
+                shouldPingHosts = true;
             }
-        }
-        catch (err) {
-            core.warning(`Failed to get Tailscale status: ${err}`);
-            if (runnerOS === runnerMacOS) {
-                core.setFailed(`❌ Tailscale status is required in order to configure macOS`);
-                process.exit(2);
-            }
-            // Still exit successfully since the main connection worked
-            core.info("✅ Tailscale daemon is connected!");
+        });
+        if (shouldPingHosts) {
             await pingHostsIfNecessary(config);
-            // Explicitly exit to prevent hanging
-            process.exit(0);
         }
     }
     catch (error) {
@@ -52176,14 +52292,16 @@ async function pingHostsIfNecessary(config) {
     if (config.pingHosts.length == 0) {
         return;
     }
-    core.info(`Will ping hosts ${config.pingHosts.join(",")} up to 3 minutes each (in parallel) in order to check connectivity`);
-    let pings = config.pingHosts.map((host) => pingHost(host));
-    for (const ping of pings) {
-        await ping;
-    }
+    await (0, logging_1.withLogGroup)(config.logMode, "Pinging Tailscale hosts", async () => {
+        (0, logging_1.logInfo)(config.logMode, `Will ping hosts ${config.pingHosts.join(",")} up to 3 minutes each (in parallel) in order to check connectivity`);
+        let pings = config.pingHosts.map((host) => pingHost(host, config.logMode));
+        for (const ping of pings) {
+            await ping;
+        }
+    });
 }
-async function pingHost(host) {
-    core.info(`Pinging host ${host}`);
+async function pingHost(host, logMode) {
+    (0, logging_1.logInfo)(logMode, `Pinging host ${host}`);
     let start = new Date().getTime();
     var i = 0;
     // Try for up to 180 seconds (3 minutes).
@@ -52191,35 +52309,32 @@ async function pingHost(host) {
         if (i > 0) {
             // Exponential backoff on wait time, with maximum 5 second wait.
             let waitTime = Math.min(Math.pow(1.3, i), 5000);
-            core.debug(`Waiting ${waitTime} milliseconds before pinging`);
+            (0, logging_1.logDebug)(logMode, `Waiting ${waitTime} milliseconds before pinging`);
             await (0, promises_1.setTimeout)(waitTime);
         }
         try {
-            let result = await execSilent("ping host", cmdTailscale, [
-                "ping",
-                "-c",
-                "1",
-                host,
-            ]);
-            core.info(`✅ Ping host ${host} reachable via direct connection!`);
+            await execSilent("ping host", cmdTailscale, ["ping", "-c", "1", host], {
+                logMode,
+            });
+            (0, logging_1.logInfo)(logMode, `✅ Ping host ${host} reachable via direct connection!`);
             return;
         }
         catch (err) {
-            if (err instanceof execError &&
+            if (err instanceof logging_1.ExecError &&
                 err.stderr.includes("direct connection not established")) {
                 // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
-                core.info(`✅ Ping host ${host} reachable via DERP!`);
+                (0, logging_1.logInfo)(logMode, `✅ Ping host ${host} reachable via DERP!`);
                 return;
             }
         }
         i++;
     }
-    core.setFailed(`❌ Ping host ${host} did not respond`);
-    process.exit(1);
+    throw new Error(`❌ Ping host ${host} did not respond`);
 }
 async function getInputs() {
     let ping = core.getInput("ping");
     let pingHosts = ping?.length > 0 ? ping.split(",") : [];
+    const logMode = (0, logging_1.getLogMode)();
     const authKey = core.getInput("authkey") || "";
     const oauthSecret = core.getInput("oauth-secret") || "";
     // Mask sensitive values in logs unless debug mode is enabled
@@ -52249,6 +52364,7 @@ async function getInputs() {
         useCache: core.getBooleanInput("use-cache"),
         sha256Sum: core.getInput("sha256sum") || "",
         pingHosts: pingHosts,
+        logMode: logMode,
     };
     if (config.oauthSecret && !config.tags) {
         throw new Error("the tags parameter is required when using an OAuth client");
@@ -52267,19 +52383,14 @@ function validateAuth(config) {
         throw new Error("Workload identity federation requires using tailscale version 1.90.0 or later.");
     }
 }
-async function resolveVersion(version, runnerOS) {
+async function resolveVersion(version, runnerOS, logMode) {
     if (runnerOS === runnerMacOS && version === versionUnstable) {
         return "main";
     }
     if (version === versionLatest || version === versionUnstable) {
         let path = version === versionUnstable ? versionUnstable : "stable";
         let pkg = `https://pkgs.tailscale.com/${path}/?mode=json`;
-        const { stdout } = await execSilent(`curl ${pkg}`, "curl", [
-            "-H",
-            "user-agent:action-setup-tailscale",
-            "-s",
-            pkg,
-        ]);
+        const { stdout } = await execSilent(`curl ${pkg}`, "curl", ["-H", "user-agent:action-setup-tailscale", "-s", pkg], { logMode });
         const response = JSON.parse(stdout);
         switch (runnerOS) {
             case runnerLinux:
@@ -52338,14 +52449,14 @@ async function installTailscale(config, runnerOS) {
     if (config.useCache && cacheKey) {
         const cacheHit = await cache.restoreCache([toolPath], cacheKey);
         if (cacheHit) {
-            core.info(`Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
+            (0, logging_1.logInfo)(config.logMode, `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
             // For Windows, install the cached MSI
             if (runnerOS === runnerWindows) {
                 await installTailscaleWindows(config, toolPath, true);
             }
             else {
                 // For Linux/macOS, copy binaries to /usr/local/bin
-                await installCachedBinaries(toolPath, runnerOS);
+                await installCachedBinaries(config, toolPath, runnerOS);
             }
             return;
         }
@@ -52364,7 +52475,7 @@ async function installTailscale(config, runnerOS) {
     if (config.useCache && cacheKey) {
         try {
             await cache.saveCache([toolPath], cacheKey);
-            core.info(`Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
+            (0, logging_1.logInfo)(config.logMode, `Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
         }
         catch (error) {
             const typedError = error;
@@ -52372,7 +52483,7 @@ async function installTailscale(config, runnerOS) {
                 throw error;
             }
             else if (typedError.name === cache.ReserveCacheError.name) {
-                core.info(typedError.message);
+                (0, logging_1.logInfo)(config.logMode, typedError.message);
             }
             else {
                 core.warning(`Cache save failed: ${typedError.message}`);
@@ -52399,26 +52510,20 @@ async function installTailscaleLinux(config, toolPath) {
     // Get SHA256 if not provided
     if (!config.sha256Sum) {
         const shaUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz.sha256`;
-        const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", [
-            "-H",
-            "user-agent:action-setup-tailscale",
-            "-L",
-            shaUrl,
-            "--fail",
-        ]);
+        const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", ["-H", "user-agent:action-setup-tailscale", "-L", shaUrl, "--fail"], { logMode: config.logMode });
         config.sha256Sum = stdout.trim();
     }
     // Download and extract
     const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
-    core.info(`Downloading ${downloadUrl}`);
+    (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
     const tarDest = path.join(xdgCacheDir(), "tailscale.tgz");
     fs.mkdirSync(path.dirname(tarDest), { recursive: true });
     const tarPath = await tc.downloadTool(downloadUrl, tarDest);
     // Verify checksum
     const actualSha = await calculateFileSha256(tarPath);
     const expectedSha = config.sha256Sum.trim().toLowerCase();
-    core.info(`Expected sha256: ${expectedSha}`);
-    core.info(`Actual sha256: ${actualSha}`);
+    (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
+    (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
     if (actualSha !== expectedSha) {
         throw new Error("SHA256 checksum mismatch");
     }
@@ -52435,18 +52540,10 @@ async function installTailscaleLinux(config, toolPath) {
         path.join(toolPath, cmdTailscale),
         path.join(toolPath, cmdTailscaled),
         "/usr/local/bin",
-    ]);
+    ], { logMode: config.logMode });
     // Make sure they're executable
-    await execSilent("chmod tailscale binary", "sudo", [
-        "chmod",
-        "+x",
-        cmdTailscaleFullPath,
-    ]);
-    await execSilent("chmod tailscaled binary", "sudo", [
-        "chmod",
-        "+x",
-        cmdTailscaledFullPath,
-    ]);
+    await execSilent("chmod tailscale binary", "sudo", ["chmod", "+x", cmdTailscaleFullPath], { logMode: config.logMode });
+    await execSilent("chmod tailscaled binary", "sudo", ["chmod", "+x", cmdTailscaledFullPath], { logMode: config.logMode });
 }
 async function installTailscaleWindows(config, toolPath, fromCache = false) {
     // Create tool directory
@@ -52457,7 +52554,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         if (!fs.existsSync(msiPath)) {
             throw new Error(`Cached MSI not found at ${msiPath}`);
         }
-        core.info(`Installing cached MSI from ${msiPath}`);
+        (0, logging_1.logInfo)(config.logMode, `Installing cached MSI from ${msiPath}`);
     }
     else {
         // Fresh download
@@ -52470,13 +52567,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         // Get SHA256 if not provided
         if (!config.sha256Sum) {
             const shaUrl = `${baseUrl}/tailscale-setup-${config.resolvedVersion}-${config.arch}.msi.sha256`;
-            const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", [
-                "-H",
-                "user-agent:action-setup-tailscale",
-                "-L",
-                shaUrl,
-                "--fail",
-            ]);
+            const { stdout } = await execSilent(`curl ${shaUrl}`, "curl", ["-H", "user-agent:action-setup-tailscale", "-L", shaUrl, "--fail"], { logMode: config.logMode });
             config.sha256Sum = stdout.trim();
         }
         // Download MSI
@@ -52487,21 +52578,21 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         if (fs.existsSync(msiPath)) {
             const existingSha = await calculateFileSha256(msiPath);
             if (existingSha === expectedSha) {
-                core.info(`Using existing MSI at ${msiPath} (checksum verified)`);
+                (0, logging_1.logInfo)(config.logMode, `Using existing MSI at ${msiPath} (checksum verified)`);
                 needsDownload = false;
             }
             else {
-                core.info(`Existing MSI checksum mismatch, re-downloading`);
+                (0, logging_1.logInfo)(config.logMode, `Existing MSI checksum mismatch, re-downloading`);
                 fs.unlinkSync(msiPath);
             }
         }
         if (needsDownload) {
-            core.info(`Downloading ${downloadUrl}`);
+            (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
             const downloadedMsiPath = await tc.downloadTool(downloadUrl, msiPath);
             // Verify checksum
             const actualSha = await calculateFileSha256(downloadedMsiPath);
-            core.info(`Expected sha256: ${expectedSha}`);
-            core.info(`Actual sha256: ${actualSha}`);
+            (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
+            (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
             if (actualSha !== expectedSha) {
                 throw new Error("SHA256 checksum mismatch");
             }
@@ -52519,17 +52610,18 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         path.join(process.env.RUNNER_TEMP || "", "tailscale.log"),
         "/i",
         msiPath,
-    ]);
+    ], { logMode: config.logMode });
     // Add to PATH
     core.addPath("C:\\Program Files\\Tailscale\\");
 }
 async function installTailscaleMacOS(config, toolPath) {
-    core.info("Building tailscale from src on macOS...");
+    (0, logging_1.logInfo)(config.logMode, "Building tailscale from src on macOS...");
     // Clone the repo
-    await execSilent("clone tailscale repo", "git clone https://github.com/tailscale/tailscale.git tailscale");
+    await execSilent("clone tailscale repo", "git clone https://github.com/tailscale/tailscale.git tailscale", [], { logMode: config.logMode });
     // Checkout the resolved version
     await execSilent("checkout resolved version", `git checkout v${config.resolvedVersion}`, [], {
         cwd: cmdTailscale,
+        logMode: config.logMode,
     });
     // Create tool directory and copy binaries there for caching
     fs.mkdirSync(toolPath, { recursive: true });
@@ -52541,6 +52633,7 @@ async function installTailscaleMacOS(config, toolPath) {
                 ...process.env,
                 TS_USE_TOOLCHAIN: "1",
             },
+            logMode: config.logMode,
         });
     }
     // Install binaries to /usr/local/bin
@@ -52549,19 +52642,11 @@ async function installTailscaleMacOS(config, toolPath) {
         path.join(toolPath, cmdTailscale),
         path.join(toolPath, cmdTailscaled),
         "/usr/local/bin",
-    ]);
+    ], { logMode: config.logMode });
     // Make sure they're executable
-    await execSilent("chmod tailscale", "sudo", [
-        "chmod",
-        "+x",
-        cmdTailscaleFullPath,
-    ]);
-    await execSilent("chmod tailscaled", "sudo", [
-        "chmod",
-        "+x",
-        cmdTailscaledFullPath,
-    ]);
-    core.info("✅ Tailscale installed successfully on macOS from source");
+    await execSilent("chmod tailscale", "sudo", ["chmod", "+x", cmdTailscaleFullPath], { logMode: config.logMode });
+    await execSilent("chmod tailscaled", "sudo", ["chmod", "+x", cmdTailscaledFullPath], { logMode: config.logMode });
+    (0, logging_1.logInfo)(config.logMode, "✅ Tailscale installed successfully on macOS from source");
 }
 async function startTailscaleDaemon(config) {
     const runnerOS = process.env.RUNNER_OS || "";
@@ -52576,7 +52661,7 @@ async function startTailscaleDaemon(config) {
         ...stateArgs,
         ...config.tailscaledArgs.split(" ").filter(Boolean),
     ];
-    core.info("Starting tailscaled daemon...");
+    (0, logging_1.logInfo)(config.logMode, "Starting tailscaled daemon...");
     // Start daemon in background
     const daemon = (0, child_process_1.spawn)("sudo", ["-E", cmdTailscaled, ...args], {
         detached: true,
@@ -52599,28 +52684,28 @@ async function startTailscaleDaemon(config) {
     if (daemon.stderr)
         daemon.stderr.destroy();
     // Poll the local API until daemon is responsive
-    await waitForDaemonReady();
-    core.info("✅ tailscaled daemon is up and running!");
+    await waitForDaemonReady(config.logMode);
+    (0, logging_1.logInfo)(config.logMode, "✅ tailscaled daemon is up and running!");
 }
-async function waitForDaemonReady() {
+async function waitForDaemonReady(logMode) {
     const maxWaitMs = 15000; // 15 seconds
     const pollIntervalMs = 500;
     let waited = 0;
-    core.info("Waiting for tailscaled daemon to become ready...");
+    (0, logging_1.logInfo)(logMode, "Waiting for tailscaled daemon to become ready...");
     var lastErr;
     while (waited < maxWaitMs) {
         try {
-            const status = await getTailscaleStatus();
+            const status = await getTailscaleStatus(logMode);
             // If we get any valid response from the API, the daemon is ready
             if (status) {
-                core.info(`Daemon ready! Initial state: ${status.BackendState || "Unknown"}`);
+                (0, logging_1.logInfo)(logMode, `Daemon ready! Initial state: ${status.BackendState || "Unknown"}`);
                 return;
             }
         }
         catch (err) {
             // Daemon not ready yet, keep polling
             lastErr = err;
-            core.debug(`Waiting for daemon... (${waited}ms elapsed)`);
+            (0, logging_1.logDebug)(logMode, `Waiting for daemon... (${waited}ms elapsed)`);
         }
         await sleep(pollIntervalMs);
         waited += pollIntervalMs;
@@ -52635,7 +52720,9 @@ async function connectToTailscale(config, runnerOS) {
             hostname = `github-${process.env.COMPUTERNAME}`;
         }
         else {
-            const { stdout } = await execSilent("hostname", "hostname");
+            const { stdout } = await execSilent("hostname", "hostname", [], {
+                logMode: config.logMode,
+            });
             hostname = `github-${stdout.trim()}`;
         }
     }
@@ -52683,7 +52770,7 @@ async function connectToTailscale(config, runnerOS) {
     // Retry logic
     for (let attempt = 1; attempt <= config.retry; attempt++) {
         try {
-            core.info(`Attempt ${attempt} to bring up Tailscale...`);
+            (0, logging_1.logInfo)(config.logMode, `Attempt ${attempt} to bring up Tailscale...`);
             let execArgs;
             if (runnerOS === runnerWindows) {
                 execArgs = [cmdTailscale, ...upArgs];
@@ -52693,12 +52780,24 @@ async function connectToTailscale(config, runnerOS) {
                 execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
-            await Promise.race([
-                execSilent("tailscale up", execArgs[0], execArgs.slice(1)),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
-            ]);
+            let timeoutHandle;
+            try {
+                await Promise.race([
+                    execSilent("tailscale up", execArgs[0], execArgs.slice(1), {
+                        logMode: config.logMode,
+                    }),
+                    new Promise((_, reject) => {
+                        timeoutHandle = setTimeout(() => reject(new Error("Timeout")), timeoutMs);
+                    }),
+                ]);
+            }
+            finally {
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                }
+            }
             // Success
-            core.info(`✅ Tailscale up command completed successfully on attempt ${attempt}`);
+            (0, logging_1.logInfo)(config.logMode, `✅ Tailscale up command completed successfully on attempt ${attempt}`);
             return;
         }
         catch (error) {
@@ -52707,7 +52806,7 @@ async function connectToTailscale(config, runnerOS) {
                 throw error;
             }
             const sleepTime = attempt * 2; // Reduced from 5 to 2 seconds
-            core.info(`Retrying in ${sleepTime} seconds...`);
+            (0, logging_1.logInfo)(config.logMode, `Retrying in ${sleepTime} seconds...`);
             await sleep(sleepTime * 1000);
         }
     }
@@ -52745,55 +52844,31 @@ function getToolPath(config, runnerOS) {
     }
     return path.join(cacheDirectory, cmdTailscale, config.resolvedVersion, `${runnerOS}-${config.arch}`);
 }
-async function installCachedBinaries(toolPath, runnerOS) {
+async function installCachedBinaries(config, toolPath, runnerOS) {
     if (runnerOS === runnerLinux || runnerOS === runnerMacOS) {
         // Copy cached binaries to /usr/local/bin
         const tailscaleBin = path.join(toolPath, cmdTailscale);
         const tailscaledBin = path.join(toolPath, cmdTailscaled);
         if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
-            await execSilent("copy tailscale from cache", "sudo", [
-                "cp",
-                tailscaleBin,
-                cmdTailscaleFullPath,
-            ]);
-            await execSilent("copy tailscaled from cache", "sudo", [
-                "cp",
-                tailscaledBin,
-                cmdTailscaledFullPath,
-            ]);
-            await execSilent("chmod tailscale", "sudo", [
-                "chmod",
-                "+x",
-                cmdTailscaleFullPath,
-            ]);
-            await execSilent("chmod tailscaled", "sudo", [
-                "chmod",
-                "+x",
-                cmdTailscaledFullPath,
-            ]);
+            await execSilent("copy tailscale from cache", "sudo", ["cp", tailscaleBin, cmdTailscaleFullPath], { logMode: config.logMode });
+            await execSilent("copy tailscaled from cache", "sudo", ["cp", tailscaledBin, cmdTailscaledFullPath], { logMode: config.logMode });
+            await execSilent("chmod tailscale", "sudo", ["chmod", "+x", cmdTailscaleFullPath], { logMode: config.logMode });
+            await execSilent("chmod tailscaled", "sudo", ["chmod", "+x", cmdTailscaledFullPath], { logMode: config.logMode });
         }
         else {
             throw new Error(`Cached binaries not found in ${toolPath}`);
         }
     }
 }
-async function configureDNSOnMacOS(status) {
+async function configureDNSOnMacOS(status, logMode) {
     if (!status.CurrentTailnet.MagicDNSEnabled) {
-        core.info("MagicDNS is disabled, not configuring DNS");
+        (0, logging_1.logInfo)(logMode, "MagicDNS is disabled, not configuring DNS");
         return;
     }
-    core.info(`Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`);
+    (0, logging_1.logInfo)(logMode, `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`);
     try {
-        await execSilent("set dns servers", "networksetup", [
-            "-setdnsservers",
-            "Ethernet",
-            "100.100.100.100",
-        ]);
-        await execSilent("set search domains", "networksetup", [
-            "-setsearchdomains",
-            "Ethernet",
-            status.CurrentTailnet.MagicDNSSuffix,
-        ]);
+        await execSilent("set dns servers", "networksetup", ["-setdnsservers", "Ethernet", "100.100.100.100"], { logMode });
+        await execSilent("set search domains", "networksetup", ["-setsearchdomains", "Ethernet", status.CurrentTailnet.MagicDNSSuffix], { logMode });
     }
     catch (e) {
         throw Error(`Failed to configure DNS on macOS: ${e}`);
@@ -52814,30 +52889,10 @@ run();
  * @throws execError if exec returned a non-zero status code
  */
 async function execSilent(label, cmd, args, opts) {
-    core.info(`▶️ ${label}`);
-    const out = await exec.getExecOutput(cmd, args, {
+    return (0, logging_1.execCommand)(cmd, args, {
         ...opts,
-        silent: !core.isDebug(),
-        ignoreReturnCode: true,
+        label,
     });
-    if (out.exitCode !== 0) {
-        if (!core.isDebug()) {
-            // When debug logging is off, stderr won't have been written to console, write it now.
-            process.stderr.write(out.stderr);
-        }
-        throw new execError(`${cmd} failed with exit code ${out.exitCode}`, out.exitCode, out.stderr);
-    }
-    return out;
-}
-class execError {
-    constructor(msg, exitCode, stderr) {
-        this.msg = msg;
-        this.exitCode = exitCode;
-        this.stderr = stderr;
-    }
-    toString() {
-        return this.msg;
-    }
 }
 
 
@@ -53064,6 +53119,14 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
+
+/***/ }),
+
+/***/ 932:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 

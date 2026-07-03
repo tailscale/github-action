@@ -25895,6 +25895,119 @@ module.exports = {
 
 /***/ }),
 
+/***/ 1338:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExecError = void 0;
+exports.getLogMode = getLogMode;
+exports.logInfo = logInfo;
+exports.logDebug = logDebug;
+exports.withLogGroup = withLogGroup;
+exports.execCommand = execCommand;
+const core = __importStar(__nccwpck_require__(7484));
+const exec = __importStar(__nccwpck_require__(5236));
+const process = __importStar(__nccwpck_require__(932));
+class ExecError {
+    constructor(msg, exitCode, stderr) {
+        this.msg = msg;
+        this.exitCode = exitCode;
+        this.stderr = stderr;
+    }
+    toString() {
+        return this.msg;
+    }
+}
+exports.ExecError = ExecError;
+function getLogMode() {
+    const logMode = core.getInput("log-mode") || "grouped";
+    if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
+        throw new Error(`Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`);
+    }
+    return logMode;
+}
+function logInfo(logMode, message) {
+    if (logMode !== "quiet") {
+        core.info(message);
+    }
+}
+function logDebug(logMode, message) {
+    if (logMode !== "quiet") {
+        core.debug(message);
+    }
+}
+async function withLogGroup(logMode, name, fn) {
+    if (logMode !== "grouped") {
+        return fn();
+    }
+    core.startGroup(name);
+    try {
+        return await fn();
+    }
+    finally {
+        core.endGroup();
+    }
+}
+async function execCommand(commandLine, args, opts) {
+    const { label, logMode = "normal", ...execOpts } = opts || {};
+    if (label) {
+        logInfo(logMode, `▶️ ${label}`);
+    }
+    const silent = execOpts.silent || logMode === "quiet" || !core.isDebug();
+    const out = await exec.getExecOutput(commandLine, args, {
+        ...execOpts,
+        silent,
+        ignoreReturnCode: true,
+    });
+    if (out.exitCode !== 0) {
+        if (silent) {
+            process.stderr.write(out.stderr);
+        }
+        throw new ExecError(`${commandLine} failed with exit code ${out.exitCode}`, out.exitCode, out.stderr);
+    }
+    return out;
+}
+
+
+/***/ }),
+
 /***/ 7254:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -25937,79 +26050,83 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
-const exec = __importStar(__nccwpck_require__(5236));
 const fs = __importStar(__nccwpck_require__(9896));
 const os = __importStar(__nccwpck_require__(857));
 const path = __importStar(__nccwpck_require__(6928));
+const logging_1 = __nccwpck_require__(1338);
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
 async function logout() {
     try {
         const runnerOS = process.env.RUNNER_OS || "";
-        if (runnerOS === runnerMacOS) {
-            // The below is required to allow GitHub's post job cleanup to complete.
-            core.info("Resetting DNS settings on macOS");
-            await exec.exec("networksetup", ["-setdnsservers", "Ethernet", "Empty"]);
-            await exec.exec("networksetup", [
-                "-setsearchdomains",
-                "Ethernet",
-                "Empty",
-            ]);
-        }
-        core.info("🔄 Logging out of Tailscale...");
-        // Check if tailscale is available first
-        try {
-            await exec.exec("tailscale", ["--version"], { silent: true });
-            // Determine the correct command based on OS
-            let execArgs;
-            if (runnerOS === runnerWindows) {
-                execArgs = ["tailscale", "logout"];
+        const logMode = (0, logging_1.getLogMode)();
+        await (0, logging_1.withLogGroup)(logMode, "Cleaning up Tailscale", async () => {
+            if (runnerOS === runnerMacOS) {
+                // The below is required to allow GitHub's post job cleanup to complete.
+                (0, logging_1.logInfo)(logMode, "Resetting DNS settings on macOS");
+                await (0, logging_1.execCommand)("networksetup", ["-setdnsservers", "Ethernet", "Empty"], { logMode });
+                await (0, logging_1.execCommand)("networksetup", ["-setsearchdomains", "Ethernet", "Empty"], { logMode });
             }
-            else {
-                // Linux and macOS - use system-installed binary with sudo
-                execArgs = ["sudo", "-E", "tailscale", "logout"];
-            }
-            core.info(`Running: ${execArgs.join(" ")}`);
+            (0, logging_1.logInfo)(logMode, "🔄 Logging out of Tailscale...");
+            // Check if tailscale is available first
             try {
-                await exec.exec(execArgs[0], execArgs.slice(1));
-                core.info("✅ Successfully logged out of Tailscale");
+                await (0, logging_1.execCommand)("tailscale", ["--version"], {
+                    logMode,
+                    silent: true,
+                });
+                // Determine the correct command based on OS
+                let execArgs;
+                if (runnerOS === runnerWindows) {
+                    execArgs = ["tailscale", "logout"];
+                }
+                else {
+                    // Linux and macOS - use system-installed binary with sudo
+                    execArgs = ["sudo", "-E", "tailscale", "logout"];
+                }
+                (0, logging_1.logInfo)(logMode, `Running: ${execArgs.join(" ")}`);
+                try {
+                    await (0, logging_1.execCommand)(execArgs[0], execArgs.slice(1), { logMode });
+                    (0, logging_1.logInfo)(logMode, "✅ Successfully logged out of Tailscale");
+                }
+                catch (error) {
+                    // Don't fail the action if logout fails - it's just cleanup
+                    core.warning(`Failed to logout from Tailscale: ${error}`);
+                    (0, logging_1.logInfo)(logMode, "Your ephemeral node will eventually be cleaned up by Tailscale");
+                }
             }
             catch (error) {
-                // Don't fail the action if logout fails - it's just cleanup
-                core.warning(`Failed to logout from Tailscale: ${error}`);
-                core.info("Your ephemeral node will eventually be cleaned up by Tailscale");
+                (0, logging_1.logInfo)(logMode, "Tailscale not found or not accessible, skipping logout");
+                return;
             }
-        }
-        catch (error) {
-            core.info("Tailscale not found or not accessible, skipping logout");
-            return;
-        }
-        core.info("Stopping tailscale");
-        try {
-            if (runnerOS === runnerWindows) {
-                await exec.exec("net", ["stop", "Tailscale"]);
-                await exec.exec("taskkill", ["/F", "/IM", "tailscale-ipn.exe"]);
-            }
-            else {
-                const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR ||
-                    process.env.XDG_CACHE_HOME ||
-                    path.join(os.homedir(), ".cache");
-                const pid = fs
-                    .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
-                    .toString();
-                if (pid === "") {
-                    throw new Error("pid file empty");
+            (0, logging_1.logInfo)(logMode, "Stopping tailscale");
+            try {
+                if (runnerOS === runnerWindows) {
+                    await (0, logging_1.execCommand)("net", ["stop", "Tailscale"], { logMode });
+                    await (0, logging_1.execCommand)("taskkill", ["/F", "/IM", "tailscale-ipn.exe"], {
+                        logMode,
+                    });
                 }
-                // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
-                await exec.exec("sudo", ["pkill", "-P", pid]);
-                // Clean up DNS and routes.
-                await exec.exec("sudo", ["tailscaled", "--cleanup"]);
+                else {
+                    const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR ||
+                        process.env.XDG_CACHE_HOME ||
+                        path.join(os.homedir(), ".cache");
+                    const pid = fs
+                        .readFileSync(path.join(xdgRuntimeDir, "tailscaled.pid"))
+                        .toString();
+                    if (pid === "") {
+                        throw new Error("pid file empty");
+                    }
+                    // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
+                    await (0, logging_1.execCommand)("sudo", ["pkill", "-P", pid], { logMode });
+                    // Clean up DNS and routes.
+                    await (0, logging_1.execCommand)("sudo", ["tailscaled", "--cleanup"], { logMode });
+                }
+                (0, logging_1.logInfo)(logMode, "✅ Stopped tailscale");
             }
-            core.info("✅ Stopped tailscale");
-        }
-        catch (error) {
-            core.warning(`Failed to stop tailscale: ${error}`);
-        }
+            catch (error) {
+                core.warning(`Failed to stop tailscale: ${error}`);
+            }
+        });
     }
     catch (error) {
         // Don't fail the action for post-cleanup issues
@@ -26182,6 +26299,14 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
+
+/***/ }),
+
+/***/ 932:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 

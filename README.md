@@ -29,8 +29,8 @@ and log out immediately after finishing their CI run, at which point they are au
 by the coordination server. The nodes are also [marked Preapproved][kb-auth-keys]
 on tailnets which use [Device Approval][kb-device-approval]
 
-
 ### Workload identity federation
+
 [Workload identity federation][kb-workload-identity-federation] can also be used for authenticating nodes with your tailnet:
 
 ```yaml
@@ -91,6 +91,27 @@ tailscale ping my-target.my-tailnet.ts.net
 ```
 
 The `ping` option will wait up to 3 minutes for a connection (direct or relayed).
+
+## Log mode
+
+By default, this action folds its major setup and cleanup phases into GitHub Actions log groups.
+You can change this with the `log-mode` input:
+
+```yaml
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    tags: tag:ci
+    log-mode: normal
+```
+
+Supported values are:
+
+- `grouped`: fold major action phases in the log. This is the default.
+- `normal`: print routine action logs without grouping.
+- `quiet`: suppress routine informational output while preserving warnings and errors.
 
 ## Tailnet Lock
 

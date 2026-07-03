@@ -64,7 +64,11 @@ inputs:
     description: 'Comma separated list of hosts (Tailscale IP addresses or machine names if MagicDNS is enabled on the tailnet) to `tailscale ping` for connectivity verification after `tailscale up` completes.'
     required: false
     default: ''
-    
+  log-mode:
+    description: 'Controls action log output mode. Use `grouped` to fold major setup and cleanup phases, `normal` for ungrouped logs, or `quiet` to suppress routine informational output.'
+    required: false
+    default: 'grouped'
+
 runs:
   using: 'node24'
   main: 'dist/index.js'
