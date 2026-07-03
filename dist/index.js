@@ -52033,6 +52033,119 @@ module.exports = {
 
 /***/ }),
 
+/***/ 91338:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExecError = void 0;
+exports.getLogMode = getLogMode;
+exports.logInfo = logInfo;
+exports.logDebug = logDebug;
+exports.withLogGroup = withLogGroup;
+exports.execCommand = execCommand;
+const core = __importStar(__nccwpck_require__(37484));
+const exec = __importStar(__nccwpck_require__(95236));
+const process = __importStar(__nccwpck_require__(932));
+class ExecError {
+    constructor(msg, exitCode, stderr) {
+        this.msg = msg;
+        this.exitCode = exitCode;
+        this.stderr = stderr;
+    }
+    toString() {
+        return this.msg;
+    }
+}
+exports.ExecError = ExecError;
+function getLogMode() {
+    const logMode = core.getInput("log-mode") || "grouped";
+    if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
+        throw new Error(`Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`);
+    }
+    return logMode;
+}
+function logInfo(logMode, message) {
+    if (logMode !== "quiet") {
+        core.info(message);
+    }
+}
+function logDebug(logMode, message) {
+    if (logMode !== "quiet") {
+        core.debug(message);
+    }
+}
+async function withLogGroup(logMode, name, fn) {
+    if (logMode !== "grouped") {
+        return fn();
+    }
+    core.startGroup(name);
+    try {
+        return await fn();
+    }
+    finally {
+        core.endGroup();
+    }
+}
+async function execCommand(commandLine, args, opts) {
+    const { label, logMode = "normal", ...execOpts } = opts || {};
+    if (label) {
+        logInfo(logMode, `▶️ ${label}`);
+    }
+    const silent = execOpts.silent || logMode === "quiet" || !core.isDebug();
+    const out = await exec.getExecOutput(commandLine, args, {
+        ...execOpts,
+        silent,
+        ignoreReturnCode: true,
+    });
+    if (out.exitCode !== 0) {
+        if (silent) {
+            process.stderr.write(out.stderr);
+        }
+        throw new ExecError(`${commandLine} failed with exit code ${out.exitCode}`, out.exitCode, out.stderr);
+    }
+    return out;
+}
+
+
+/***/ }),
+
 /***/ 41730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -52076,7 +52189,6 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
-const exec = __importStar(__nccwpck_require__(95236));
 const tc = __importStar(__nccwpck_require__(33472));
 const child_process_1 = __nccwpck_require__(35317);
 const crypto = __importStar(__nccwpck_require__(76982));
@@ -52085,6 +52197,7 @@ const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
 const semver = __importStar(__nccwpck_require__(62088));
 const promises_1 = __nccwpck_require__(16460);
+const logging_1 = __nccwpck_require__(91338);
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
@@ -52122,29 +52235,29 @@ async function run() {
         }
         // Validate authentication
         validateAuth(config);
-        await withLogGroup(config.logMode, "Resolving Tailscale version", async () => {
+        await (0, logging_1.withLogGroup)(config.logMode, "Resolving Tailscale version", async () => {
             config.resolvedVersion = await resolveVersion(config.version, runnerOS, config.logMode);
-            logInfo(config.logMode, `Resolved Tailscale version: ${config.resolvedVersion}`);
+            (0, logging_1.logInfo)(config.logMode, `Resolved Tailscale version: ${config.resolvedVersion}`);
         });
         // Set architecture
         config.arch = getTailscaleArch(runnerOS);
-        await withLogGroup(config.logMode, "Installing Tailscale", async () => {
+        await (0, logging_1.withLogGroup)(config.logMode, "Installing Tailscale", async () => {
             await installTailscale(config, runnerOS);
         });
         if (runnerOS !== runnerWindows) {
-            await withLogGroup(config.logMode, "Starting tailscaled", async () => {
+            await (0, logging_1.withLogGroup)(config.logMode, "Starting tailscaled", async () => {
                 await startTailscaleDaemon(config);
             });
         }
-        await withLogGroup(config.logMode, "Connecting to Tailscale", async () => {
+        await (0, logging_1.withLogGroup)(config.logMode, "Connecting to Tailscale", async () => {
             await connectToTailscale(config, runnerOS);
         });
         let shouldPingHosts = false;
-        await withLogGroup(config.logMode, "Checking Tailscale status", async () => {
+        await (0, logging_1.withLogGroup)(config.logMode, "Checking Tailscale status", async () => {
             try {
                 const status = await getTailscaleStatus(config.logMode);
                 if (status.BackendState === "Running") {
-                    logInfo(config.logMode, "✅ Tailscale is running and connected!");
+                    (0, logging_1.logInfo)(config.logMode, "✅ Tailscale is running and connected!");
                     if (runnerOS === runnerMacOS) {
                         await configureDNSOnMacOS(status, config.logMode);
                     }
@@ -52163,7 +52276,7 @@ async function run() {
                     return;
                 }
                 // Still exit successfully since the main connection worked
-                logInfo(config.logMode, "✅ Tailscale daemon is connected!");
+                (0, logging_1.logInfo)(config.logMode, "✅ Tailscale daemon is connected!");
                 shouldPingHosts = true;
             }
         });
@@ -52179,8 +52292,8 @@ async function pingHostsIfNecessary(config) {
     if (config.pingHosts.length == 0) {
         return;
     }
-    await withLogGroup(config.logMode, "Pinging Tailscale hosts", async () => {
-        logInfo(config.logMode, `Will ping hosts ${config.pingHosts.join(",")} up to 3 minutes each (in parallel) in order to check connectivity`);
+    await (0, logging_1.withLogGroup)(config.logMode, "Pinging Tailscale hosts", async () => {
+        (0, logging_1.logInfo)(config.logMode, `Will ping hosts ${config.pingHosts.join(",")} up to 3 minutes each (in parallel) in order to check connectivity`);
         let pings = config.pingHosts.map((host) => pingHost(host, config.logMode));
         for (const ping of pings) {
             await ping;
@@ -52188,7 +52301,7 @@ async function pingHostsIfNecessary(config) {
     });
 }
 async function pingHost(host, logMode) {
-    logInfo(logMode, `Pinging host ${host}`);
+    (0, logging_1.logInfo)(logMode, `Pinging host ${host}`);
     let start = new Date().getTime();
     var i = 0;
     // Try for up to 180 seconds (3 minutes).
@@ -52196,21 +52309,21 @@ async function pingHost(host, logMode) {
         if (i > 0) {
             // Exponential backoff on wait time, with maximum 5 second wait.
             let waitTime = Math.min(Math.pow(1.3, i), 5000);
-            logDebug(logMode, `Waiting ${waitTime} milliseconds before pinging`);
+            (0, logging_1.logDebug)(logMode, `Waiting ${waitTime} milliseconds before pinging`);
             await (0, promises_1.setTimeout)(waitTime);
         }
         try {
             await execSilent("ping host", cmdTailscale, ["ping", "-c", "1", host], {
                 logMode,
             });
-            logInfo(logMode, `✅ Ping host ${host} reachable via direct connection!`);
+            (0, logging_1.logInfo)(logMode, `✅ Ping host ${host} reachable via direct connection!`);
             return;
         }
         catch (err) {
-            if (err instanceof execError &&
+            if (err instanceof logging_1.ExecError &&
                 err.stderr.includes("direct connection not established")) {
                 // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
-                logInfo(logMode, `✅ Ping host ${host} reachable via DERP!`);
+                (0, logging_1.logInfo)(logMode, `✅ Ping host ${host} reachable via DERP!`);
                 return;
             }
         }
@@ -52218,39 +52331,10 @@ async function pingHost(host, logMode) {
     }
     throw new Error(`❌ Ping host ${host} did not respond`);
 }
-function getLogMode() {
-    const logMode = core.getInput("log-mode") || "grouped";
-    if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
-        throw new Error(`Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`);
-    }
-    return logMode;
-}
-function logInfo(logMode, message) {
-    if (logMode !== "quiet") {
-        core.info(message);
-    }
-}
-function logDebug(logMode, message) {
-    if (logMode !== "quiet") {
-        core.debug(message);
-    }
-}
-async function withLogGroup(logMode, name, fn) {
-    if (logMode !== "grouped") {
-        return fn();
-    }
-    core.startGroup(name);
-    try {
-        return await fn();
-    }
-    finally {
-        core.endGroup();
-    }
-}
 async function getInputs() {
     let ping = core.getInput("ping");
     let pingHosts = ping?.length > 0 ? ping.split(",") : [];
-    const logMode = getLogMode();
+    const logMode = (0, logging_1.getLogMode)();
     const authKey = core.getInput("authkey") || "";
     const oauthSecret = core.getInput("oauth-secret") || "";
     // Mask sensitive values in logs unless debug mode is enabled
@@ -52365,7 +52449,7 @@ async function installTailscale(config, runnerOS) {
     if (config.useCache && cacheKey) {
         const cacheHit = await cache.restoreCache([toolPath], cacheKey);
         if (cacheHit) {
-            logInfo(config.logMode, `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
+            (0, logging_1.logInfo)(config.logMode, `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
             // For Windows, install the cached MSI
             if (runnerOS === runnerWindows) {
                 await installTailscaleWindows(config, toolPath, true);
@@ -52391,7 +52475,7 @@ async function installTailscale(config, runnerOS) {
     if (config.useCache && cacheKey) {
         try {
             await cache.saveCache([toolPath], cacheKey);
-            logInfo(config.logMode, `Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
+            (0, logging_1.logInfo)(config.logMode, `Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
         }
         catch (error) {
             const typedError = error;
@@ -52399,7 +52483,7 @@ async function installTailscale(config, runnerOS) {
                 throw error;
             }
             else if (typedError.name === cache.ReserveCacheError.name) {
-                logInfo(config.logMode, typedError.message);
+                (0, logging_1.logInfo)(config.logMode, typedError.message);
             }
             else {
                 core.warning(`Cache save failed: ${typedError.message}`);
@@ -52431,15 +52515,15 @@ async function installTailscaleLinux(config, toolPath) {
     }
     // Download and extract
     const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
-    logInfo(config.logMode, `Downloading ${downloadUrl}`);
+    (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
     const tarDest = path.join(xdgCacheDir(), "tailscale.tgz");
     fs.mkdirSync(path.dirname(tarDest), { recursive: true });
     const tarPath = await tc.downloadTool(downloadUrl, tarDest);
     // Verify checksum
     const actualSha = await calculateFileSha256(tarPath);
     const expectedSha = config.sha256Sum.trim().toLowerCase();
-    logInfo(config.logMode, `Expected sha256: ${expectedSha}`);
-    logInfo(config.logMode, `Actual sha256: ${actualSha}`);
+    (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
+    (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
     if (actualSha !== expectedSha) {
         throw new Error("SHA256 checksum mismatch");
     }
@@ -52470,7 +52554,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         if (!fs.existsSync(msiPath)) {
             throw new Error(`Cached MSI not found at ${msiPath}`);
         }
-        logInfo(config.logMode, `Installing cached MSI from ${msiPath}`);
+        (0, logging_1.logInfo)(config.logMode, `Installing cached MSI from ${msiPath}`);
     }
     else {
         // Fresh download
@@ -52494,21 +52578,21 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
         if (fs.existsSync(msiPath)) {
             const existingSha = await calculateFileSha256(msiPath);
             if (existingSha === expectedSha) {
-                logInfo(config.logMode, `Using existing MSI at ${msiPath} (checksum verified)`);
+                (0, logging_1.logInfo)(config.logMode, `Using existing MSI at ${msiPath} (checksum verified)`);
                 needsDownload = false;
             }
             else {
-                logInfo(config.logMode, `Existing MSI checksum mismatch, re-downloading`);
+                (0, logging_1.logInfo)(config.logMode, `Existing MSI checksum mismatch, re-downloading`);
                 fs.unlinkSync(msiPath);
             }
         }
         if (needsDownload) {
-            logInfo(config.logMode, `Downloading ${downloadUrl}`);
+            (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
             const downloadedMsiPath = await tc.downloadTool(downloadUrl, msiPath);
             // Verify checksum
             const actualSha = await calculateFileSha256(downloadedMsiPath);
-            logInfo(config.logMode, `Expected sha256: ${expectedSha}`);
-            logInfo(config.logMode, `Actual sha256: ${actualSha}`);
+            (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
+            (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
             if (actualSha !== expectedSha) {
                 throw new Error("SHA256 checksum mismatch");
             }
@@ -52531,7 +52615,7 @@ async function installTailscaleWindows(config, toolPath, fromCache = false) {
     core.addPath("C:\\Program Files\\Tailscale\\");
 }
 async function installTailscaleMacOS(config, toolPath) {
-    logInfo(config.logMode, "Building tailscale from src on macOS...");
+    (0, logging_1.logInfo)(config.logMode, "Building tailscale from src on macOS...");
     // Clone the repo
     await execSilent("clone tailscale repo", "git clone https://github.com/tailscale/tailscale.git tailscale", [], { logMode: config.logMode });
     // Checkout the resolved version
@@ -52562,7 +52646,7 @@ async function installTailscaleMacOS(config, toolPath) {
     // Make sure they're executable
     await execSilent("chmod tailscale", "sudo", ["chmod", "+x", cmdTailscaleFullPath], { logMode: config.logMode });
     await execSilent("chmod tailscaled", "sudo", ["chmod", "+x", cmdTailscaledFullPath], { logMode: config.logMode });
-    logInfo(config.logMode, "✅ Tailscale installed successfully on macOS from source");
+    (0, logging_1.logInfo)(config.logMode, "✅ Tailscale installed successfully on macOS from source");
 }
 async function startTailscaleDaemon(config) {
     const runnerOS = process.env.RUNNER_OS || "";
@@ -52577,7 +52661,7 @@ async function startTailscaleDaemon(config) {
         ...stateArgs,
         ...config.tailscaledArgs.split(" ").filter(Boolean),
     ];
-    logInfo(config.logMode, "Starting tailscaled daemon...");
+    (0, logging_1.logInfo)(config.logMode, "Starting tailscaled daemon...");
     // Start daemon in background
     const daemon = (0, child_process_1.spawn)("sudo", ["-E", cmdTailscaled, ...args], {
         detached: true,
@@ -52601,27 +52685,27 @@ async function startTailscaleDaemon(config) {
         daemon.stderr.destroy();
     // Poll the local API until daemon is responsive
     await waitForDaemonReady(config.logMode);
-    logInfo(config.logMode, "✅ tailscaled daemon is up and running!");
+    (0, logging_1.logInfo)(config.logMode, "✅ tailscaled daemon is up and running!");
 }
 async function waitForDaemonReady(logMode) {
     const maxWaitMs = 15000; // 15 seconds
     const pollIntervalMs = 500;
     let waited = 0;
-    logInfo(logMode, "Waiting for tailscaled daemon to become ready...");
+    (0, logging_1.logInfo)(logMode, "Waiting for tailscaled daemon to become ready...");
     var lastErr;
     while (waited < maxWaitMs) {
         try {
             const status = await getTailscaleStatus(logMode);
             // If we get any valid response from the API, the daemon is ready
             if (status) {
-                logInfo(logMode, `Daemon ready! Initial state: ${status.BackendState || "Unknown"}`);
+                (0, logging_1.logInfo)(logMode, `Daemon ready! Initial state: ${status.BackendState || "Unknown"}`);
                 return;
             }
         }
         catch (err) {
             // Daemon not ready yet, keep polling
             lastErr = err;
-            logDebug(logMode, `Waiting for daemon... (${waited}ms elapsed)`);
+            (0, logging_1.logDebug)(logMode, `Waiting for daemon... (${waited}ms elapsed)`);
         }
         await sleep(pollIntervalMs);
         waited += pollIntervalMs;
@@ -52686,7 +52770,7 @@ async function connectToTailscale(config, runnerOS) {
     // Retry logic
     for (let attempt = 1; attempt <= config.retry; attempt++) {
         try {
-            logInfo(config.logMode, `Attempt ${attempt} to bring up Tailscale...`);
+            (0, logging_1.logInfo)(config.logMode, `Attempt ${attempt} to bring up Tailscale...`);
             let execArgs;
             if (runnerOS === runnerWindows) {
                 execArgs = [cmdTailscale, ...upArgs];
@@ -52713,7 +52797,7 @@ async function connectToTailscale(config, runnerOS) {
                 }
             }
             // Success
-            logInfo(config.logMode, `✅ Tailscale up command completed successfully on attempt ${attempt}`);
+            (0, logging_1.logInfo)(config.logMode, `✅ Tailscale up command completed successfully on attempt ${attempt}`);
             return;
         }
         catch (error) {
@@ -52722,7 +52806,7 @@ async function connectToTailscale(config, runnerOS) {
                 throw error;
             }
             const sleepTime = attempt * 2; // Reduced from 5 to 2 seconds
-            logInfo(config.logMode, `Retrying in ${sleepTime} seconds...`);
+            (0, logging_1.logInfo)(config.logMode, `Retrying in ${sleepTime} seconds...`);
             await sleep(sleepTime * 1000);
         }
     }
@@ -52778,10 +52862,10 @@ async function installCachedBinaries(config, toolPath, runnerOS) {
 }
 async function configureDNSOnMacOS(status, logMode) {
     if (!status.CurrentTailnet.MagicDNSEnabled) {
-        logInfo(logMode, "MagicDNS is disabled, not configuring DNS");
+        (0, logging_1.logInfo)(logMode, "MagicDNS is disabled, not configuring DNS");
         return;
     }
-    logInfo(logMode, `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`);
+    (0, logging_1.logInfo)(logMode, `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`);
     try {
         await execSilent("set dns servers", "networksetup", ["-setdnsservers", "Ethernet", "100.100.100.100"], { logMode });
         await execSilent("set search domains", "networksetup", ["-setsearchdomains", "Ethernet", status.CurrentTailnet.MagicDNSSuffix], { logMode });
@@ -52805,31 +52889,10 @@ run();
  * @throws execError if exec returned a non-zero status code
  */
 async function execSilent(label, cmd, args, opts) {
-    const { logMode = "normal", ...execOpts } = opts || {};
-    logInfo(logMode, `▶️ ${label}`);
-    const out = await exec.getExecOutput(cmd, args, {
-        ...execOpts,
-        silent: logMode === "quiet" || !core.isDebug(),
-        ignoreReturnCode: true,
+    return (0, logging_1.execCommand)(cmd, args, {
+        ...opts,
+        label,
     });
-    if (out.exitCode !== 0) {
-        if (logMode === "quiet" || !core.isDebug()) {
-            // When debug logging is off, stderr won't have been written to console, write it now.
-            process.stderr.write(out.stderr);
-        }
-        throw new execError(`${cmd} failed with exit code ${out.exitCode}`, out.exitCode, out.stderr);
-    }
-    return out;
-}
-class execError {
-    constructor(msg, exitCode, stderr) {
-        this.msg = msg;
-        this.exitCode = exitCode;
-        this.stderr = stderr;
-    }
-    toString() {
-        return this.msg;
-    }
 }
 
 
@@ -53056,6 +53119,14 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
+
+/***/ }),
+
+/***/ 932:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 

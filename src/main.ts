@@ -12,6 +12,15 @@ import * as os from "os";
 import * as path from "path";
 import * as semver from "semver";
 import { setTimeout as wait } from "timers/promises";
+import {
+  ExecError,
+  execCommand,
+  getLogMode,
+  logDebug,
+  logInfo,
+  withLogGroup,
+} from "./logging";
+import type { LogMode } from "./logging";
 
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
@@ -33,8 +42,6 @@ function xdgRuntimeDir(): string {
 
 const versionLatest = "latest";
 const versionUnstable = "unstable";
-
-type LogMode = "grouped" | "normal" | "quiet";
 
 interface TailscaleConfig {
   version: string;
@@ -219,7 +226,7 @@ async function pingHost(host: string, logMode: LogMode): Promise<void> {
       return;
     } catch (err) {
       if (
-        err instanceof execError &&
+        err instanceof ExecError &&
         err.stderr.includes("direct connection not established")
       ) {
         // Relayed connectivity is good enough, we don't want to tie up a CI job waiting for a direct connection.
@@ -230,45 +237,6 @@ async function pingHost(host: string, logMode: LogMode): Promise<void> {
     i++;
   }
   throw new Error(`❌ Ping host ${host} did not respond`);
-}
-
-function getLogMode(): LogMode {
-  const logMode = core.getInput("log-mode") || "grouped";
-  if (logMode !== "grouped" && logMode !== "normal" && logMode !== "quiet") {
-    throw new Error(
-      `Invalid log-mode "${logMode}". Expected "grouped", "normal", or "quiet".`,
-    );
-  }
-  return logMode;
-}
-
-function logInfo(logMode: LogMode, message: string): void {
-  if (logMode !== "quiet") {
-    core.info(message);
-  }
-}
-
-function logDebug(logMode: LogMode, message: string): void {
-  if (logMode !== "quiet") {
-    core.debug(message);
-  }
-}
-
-async function withLogGroup<T>(
-  logMode: LogMode,
-  name: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  if (logMode !== "grouped") {
-    return fn();
-  }
-
-  core.startGroup(name);
-  try {
-    return await fn();
-  } finally {
-    core.endGroup();
-  }
 }
 
 async function getInputs(): Promise<TailscaleConfig> {
@@ -1076,39 +1044,8 @@ async function execSilent(
   args?: string[],
   opts?: exec.ExecOptions & { logMode?: LogMode },
 ): Promise<exec.ExecOutput> {
-  const { logMode = "normal", ...execOpts } = opts || {};
-  logInfo(logMode, `▶️ ${label}`);
-  const out = await exec.getExecOutput(cmd, args, {
-    ...execOpts,
-    silent: logMode === "quiet" || !core.isDebug(),
-    ignoreReturnCode: true,
+  return execCommand(cmd, args, {
+    ...opts,
+    label,
   });
-  if (out.exitCode !== 0) {
-    if (logMode === "quiet" || !core.isDebug()) {
-      // When debug logging is off, stderr won't have been written to console, write it now.
-      process.stderr.write(out.stderr);
-    }
-    throw new execError(
-      `${cmd} failed with exit code ${out.exitCode}`,
-      out.exitCode,
-      out.stderr,
-    );
-  }
-  return out;
-}
-
-class execError {
-  msg: string;
-  exitCode: number;
-  stderr: string;
-
-  public constructor(msg: string, exitCode: number, stderr: string) {
-    this.msg = msg;
-    this.exitCode = exitCode;
-    this.stderr = stderr;
-  }
-
-  public toString(): string {
-    return this.msg;
-  }
 }
