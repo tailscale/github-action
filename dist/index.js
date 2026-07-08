@@ -52515,17 +52515,37 @@ async function installTailscaleLinux(config, toolPath) {
     }
     // Download and extract
     const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
-    (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
+    const expectedSha = config.sha256Sum.trim().toLowerCase();
     const tarDest = path.join(xdgCacheDir(), "tailscale.tgz");
     fs.mkdirSync(path.dirname(tarDest), { recursive: true });
-    const tarPath = await tc.downloadTool(downloadUrl, tarDest);
-    // Verify checksum
-    const actualSha = await calculateFileSha256(tarPath);
-    const expectedSha = config.sha256Sum.trim().toLowerCase();
-    (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
-    (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
-    if (actualSha !== expectedSha) {
-        throw new Error("SHA256 checksum mismatch");
+    // Check if the tarball already exists with the correct checksum (for
+    // persistent self-hosted runners). tc.downloadTool refuses to overwrite an
+    // existing destination, so a tarball leaked by a previous job would
+    // otherwise fail with "Destination file path already exists" whenever the
+    // GitHub Actions cache backend doesn't return a hit.
+    let tarPath = tarDest;
+    let needsDownload = true;
+    if (fs.existsSync(tarDest)) {
+        const existingSha = await calculateFileSha256(tarDest);
+        if (existingSha === expectedSha) {
+            (0, logging_1.logInfo)(config.logMode, `Using existing tarball at ${tarDest} (checksum verified)`);
+            needsDownload = false;
+        }
+        else {
+            (0, logging_1.logInfo)(config.logMode, `Existing tarball checksum mismatch, re-downloading`);
+            fs.unlinkSync(tarDest);
+        }
+    }
+    if (needsDownload) {
+        (0, logging_1.logInfo)(config.logMode, `Downloading ${downloadUrl}`);
+        tarPath = await tc.downloadTool(downloadUrl, tarDest);
+        // Verify checksum
+        const actualSha = await calculateFileSha256(tarPath);
+        (0, logging_1.logInfo)(config.logMode, `Expected sha256: ${expectedSha}`);
+        (0, logging_1.logInfo)(config.logMode, `Actual sha256: ${actualSha}`);
+        if (actualSha !== expectedSha) {
+            throw new Error("SHA256 checksum mismatch");
+        }
     }
     // Extract to tool path
     const extractedPath = await tc.extractTar(tarPath, undefined, "xz");
