@@ -7,7 +7,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "ncc build src/main.ts -o dist && ncc build src/logout/logout.ts -o dist/logout"
+    "build": "ncc build src/main.ts -o dist && ncc build src/logout/logout.ts -o dist/logout && ncc build src/logging.ts -o dist"
   },
   "repository": {
     "type": "git",
@@ -18,14 +18,14 @@
   "dependencies": {
     "@actions/cache": "^5.0.2",
     "@actions/core": "^2.0.2",
-    "@actions/exec": "^2.0.0",
+    "@actions/exec": "^3.0.0",
     "@actions/tool-cache": "^3.0.0",
     "semver": "^7.7.3"
   },
   "devDependencies": {
     "@types/node": "^24.10.2",
-    "@vercel/ncc": "^0.38.3",
-    "typescript": "^5.8.3",
+    "@vercel/ncc": "^0.44.1",
+    "typescript": "^6.0.3",
     "prettier": "^3.8.3",
     "prettier-plugin-organize-imports": "^4.3.0"
   },
