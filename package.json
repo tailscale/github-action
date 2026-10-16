@@ -20,7 +20,7 @@
     "@actions/core": "^2.0.2",
     "@actions/exec": "^2.0.0",
     "@actions/tool-cache": "^3.0.0",
-    "semver": "^7.7.3"
+    "semver": "^7.8.5"
   },
   "devDependencies": {
     "@types/node": "^24.10.2",
