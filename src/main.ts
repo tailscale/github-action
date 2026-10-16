@@ -387,6 +387,8 @@ async function installTailscale(
   const cacheKey = generateCacheKey(config, runnerOS);
   const toolPath = getToolPath(config, runnerOS);
 
+  logInfo(config.logMode, `cache key is ${cacheKey} and tool path is ${toolPath}`);
+
   // Try to restore from cache first
   if (config.useCache && cacheKey) {
     const cacheHit = await cache.restoreCache([toolPath], cacheKey);
