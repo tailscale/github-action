@@ -52347,7 +52347,7 @@ async function getInputs() {
         }
     }
     const config = {
-        version: core.getInput("version") || "1.94.2",
+        version: parseVersion(core.getInput("version") || "1.94.2"),
         resolvedVersion: "",
         arch: "",
         authKey: authKey,
@@ -52370,6 +52370,16 @@ async function getInputs() {
         throw new Error("the tags parameter is required when using an OAuth client");
     }
     return config;
+}
+function parseVersion(input) {
+    if (input === versionLatest || input === versionUnstable) {
+        return input;
+    }
+    const version = input.replace(/^v/, "");
+    if (!/^\d+\.\d+\.\d+$/.test(version)) {
+        throw new Error(`Invalid version "${input}": use a version number such as 1.104.2, "latest", or "unstable".`);
+    }
+    return version;
 }
 function validateAuth(config) {
     if (!config.authKey &&
