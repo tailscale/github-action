@@ -52758,30 +52758,9 @@ async function connectToTailscale(config, runnerOS) {
     }
     // Limit hostname to 63 characters (more will result in the error "not a valid DNS label")
     hostname = hostname.substring(0, 63);
-    // Prepare auth and tags.
-    //
-    // Items higher in this list take precedence for auth:
-    // 1. Workload identity
-    // 2. OAuth client
-    // 3. Auth key
-    let authArgs;
-    let tagsArg = [];
-    authArgs = [`--authkey=${config.authKey}`];
-    if (config.audience || config.oauthSecret) {
-        tagsArg = [`--advertise-tags=${config.tags}`];
-        if (config.audience) {
-            const token = await core.getIDToken(config.audience);
-            authArgs = [
-                `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
-                `--id-token=${token}`,
-            ];
-        }
-        else if (config.oauthSecret) {
-            authArgs = [
-                `--authkey=${config.oauthSecret}?preauthorized=true&ephemeral=true`,
-            ];
-        }
-    }
+    const tagsArg = config.audience || config.oauthSecret
+        ? [`--advertise-tags=${config.tags}`]
+        : [];
     // Platform-specific args
     const platformArgs = [];
     if (runnerOS === runnerWindows) {
@@ -52795,19 +52774,21 @@ async function connectToTailscale(config, runnerOS) {
         "--accept-routes",
         ...platformArgs,
         ...config.args.split(" ").filter(Boolean),
-        ...authArgs,
     ];
     // Retry logic
     for (let attempt = 1; attempt <= config.retry; attempt++) {
         try {
             (0, logging_1.logInfo)(config.logMode, `Attempt ${attempt} to bring up Tailscale...`);
+            // Fetched on every attempt, so that a transient failure from GitHub's
+            // OIDC token endpoint is retried along with `tailscale up`.
+            const authArgs = await getAuthArgs(config);
             let execArgs;
             if (runnerOS === runnerWindows) {
-                execArgs = [cmdTailscale, ...upArgs];
+                execArgs = [cmdTailscale, ...upArgs, ...authArgs];
             }
             else {
                 // Linux and macOS - use system-installed binary with sudo
-                execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
+                execArgs = ["sudo", "-E", cmdTailscale, ...upArgs, ...authArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
             let timeoutHandle;
@@ -52840,6 +52821,25 @@ async function connectToTailscale(config, runnerOS) {
             await sleep(sleepTime * 1000);
         }
     }
+}
+// Items higher in this list take precedence for auth:
+// 1. Workload identity
+// 2. OAuth client
+// 3. Auth key
+async function getAuthArgs(config) {
+    if (config.audience) {
+        const token = await core.getIDToken(config.audience);
+        return [
+            `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
+            `--id-token=${token}`,
+        ];
+    }
+    if (config.oauthSecret) {
+        return [
+            `--authkey=${config.oauthSecret}?preauthorized=true&ephemeral=true`,
+        ];
+    }
+    return [`--authkey=${config.authKey}`];
 }
 function parseTimeout(timeout) {
     const match = timeout.match(/^(\d+)([smh]?)$/);
