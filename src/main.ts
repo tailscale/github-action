@@ -709,6 +709,7 @@ async function installTailscaleMacOS(
         env: {
           ...process.env,
           TS_USE_TOOLCHAIN: "1",
+          GOWORK: "off",
         },
         logMode: config.logMode,
       },
