@@ -49,6 +49,10 @@ permissions:
   id-token: write # This is required for the tailscale action to request a JWT from GitHub
 ```
 
+The OIDC token is passed to the Tailscale CLI through a private temporary file,
+rather than a command-line argument. The file is removed after the connection
+attempts finish, including on failure.
+
 OIDC federated identity credentials used for this purpose must have the writable [`auth_keys` scope.][kb-trust-credentials-scopes]
 
 tags is a comma-separated list of one or more [Tags][kb-tags]

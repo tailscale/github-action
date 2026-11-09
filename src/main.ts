@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as semver from "semver";
+import { withOIDCTokenFile } from "./oidc";
 import { setTimeout as wait } from "timers/promises";
 import {
   ExecError,
@@ -864,16 +865,34 @@ async function connectToTailscale(
 
     if (config.audience) {
       const token = await core.getIDToken(config.audience);
-      authArgs = [
-        `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
-        `--id-token=${token}`,
-      ];
+      return withOIDCTokenFile(token, (tokenFile) =>
+        connectWithAuth(
+          config,
+          runnerOS,
+          hostname,
+          [
+            `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
+            `--id-token=file:${tokenFile}`,
+          ],
+          tagsArg,
+        ),
+      );
     } else if (config.oauthSecret) {
       authArgs = [
         `--authkey=${config.oauthSecret}?preauthorized=true&ephemeral=true`,
       ];
     }
   }
+  return connectWithAuth(config, runnerOS, hostname, authArgs, tagsArg);
+}
+
+async function connectWithAuth(
+  config: TailscaleConfig,
+  runnerOS: string,
+  hostname: string,
+  authArgs: string[],
+  tagsArg: string[],
+): Promise<void> {
   // Platform-specific args
   const platformArgs: string[] = [];
   if (runnerOS === runnerWindows) {

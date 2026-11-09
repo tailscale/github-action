@@ -35,6 +35,9 @@ jobs:
             echo "  make format" && \
             echo "" && exit 1)
 
+      - name: Test OIDC token file handling
+        run: node --test --experimental-strip-types src/oidc.test.ts
+
       - name: Run build check
         run: |
           npm run build && test -z "$(git status --porcelain)" || ( \

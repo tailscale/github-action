@@ -52196,6 +52196,7 @@ const fs = __importStar(__nccwpck_require__(79896));
 const os = __importStar(__nccwpck_require__(70857));
 const path = __importStar(__nccwpck_require__(16928));
 const semver = __importStar(__nccwpck_require__(62088));
+const oidc_1 = __nccwpck_require__(96434);
 const promises_1 = __nccwpck_require__(16460);
 const logging_1 = __nccwpck_require__(91338);
 const cmdTailscale = "tailscale";
@@ -52771,10 +52772,10 @@ async function connectToTailscale(config, runnerOS) {
         tagsArg = [`--advertise-tags=${config.tags}`];
         if (config.audience) {
             const token = await core.getIDToken(config.audience);
-            authArgs = [
+            return (0, oidc_1.withOIDCTokenFile)(token, (tokenFile) => connectWithAuth(config, runnerOS, hostname, [
                 `--client-id=${config.oauthClientId}?preauthorized=true&ephemeral=true`,
-                `--id-token=${token}`,
-            ];
+                `--id-token=file:${tokenFile}`,
+            ], tagsArg));
         }
         else if (config.oauthSecret) {
             authArgs = [
@@ -52782,6 +52783,9 @@ async function connectToTailscale(config, runnerOS) {
             ];
         }
     }
+    return connectWithAuth(config, runnerOS, hostname, authArgs, tagsArg);
+}
+async function connectWithAuth(config, runnerOS, hostname, authArgs, tagsArg) {
     // Platform-specific args
     const platformArgs = [];
     if (runnerOS === runnerWindows) {
@@ -52923,6 +52927,69 @@ async function execSilent(label, cmd, args, opts) {
         ...opts,
         label,
     });
+}
+
+
+/***/ }),
+
+/***/ 96434:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.withOIDCTokenFile = withOIDCTokenFile;
+const fs = __importStar(__nccwpck_require__(79896));
+const os = __importStar(__nccwpck_require__(70857));
+const path = __importStar(__nccwpck_require__(16928));
+// Keep the token out of command arguments, including when runner debug logging
+// is enabled. The file remains available across retries and is removed on exit.
+async function withOIDCTokenFile(token, connect) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "tailscale-oidc-"));
+    try {
+        fs.chmodSync(directory, 0o700);
+        const tokenFile = path.join(directory, "token");
+        fs.writeFileSync(tokenFile, token, { mode: 0o600, flag: "wx" });
+        return await connect(tokenFile);
+    }
+    finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+    }
 }
 
 
