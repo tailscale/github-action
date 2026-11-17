@@ -6,9 +6,9 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { execCommand, getLogMode, logInfo, withLogGroup } from "../logging";
+import { restoreDNSOnMacOS } from "../macos-dns";
 
 const runnerWindows = "Windows";
-const runnerMacOS = "macOS";
 
 async function logout(): Promise<void> {
   try {
@@ -16,19 +16,10 @@ async function logout(): Promise<void> {
     const logMode = getLogMode();
 
     await withLogGroup(logMode, "Cleaning up Tailscale", async () => {
-      if (runnerOS === runnerMacOS) {
-        // The below is required to allow GitHub's post job cleanup to complete.
-        logInfo(logMode, "Resetting DNS settings on macOS");
-        await execCommand(
-          "networksetup",
-          ["-setdnsservers", "Ethernet", "Empty"],
-          { logMode },
-        );
-        await execCommand(
-          "networksetup",
-          ["-setsearchdomains", "Ethernet", "Empty"],
-          { logMode },
-        );
+      try {
+        await restoreDNSOnMacOS(logMode);
+      } catch (error) {
+        core.warning(`Failed to restore DNS settings on macOS: ${error}`);
       }
 
       logInfo(logMode, "🔄 Logging out of Tailscale...");

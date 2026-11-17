@@ -52146,6 +52146,145 @@ async function execCommand(commandLine, args, opts) {
 
 /***/ }),
 
+/***/ 28320:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+// Copyright (c) Lee Briggs, Tailscale Inc, & Contributors
+// SPDX-License-Identifier: BSD-3-Clause
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.acceptsDNS = acceptsDNS;
+exports.configureDNSOnMacOS = configureDNSOnMacOS;
+exports.restoreDNSOnMacOS = restoreDNSOnMacOS;
+const core = __importStar(__nccwpck_require__(37484));
+const net_1 = __nccwpck_require__(69278);
+const logging_1 = __nccwpck_require__(91338);
+const stateKey = "macos-dns";
+const goFalse = ["0", "f", "F", "false", "FALSE", "False"];
+function acceptsDNS(args) {
+    let accept = true;
+    for (const arg of args.split(" ").filter(Boolean)) {
+        const flag = arg.match(/^--?accept-dns(?:=(.*))?$/);
+        if (flag) {
+            accept = !goFalse.includes(flag[1] ?? "true");
+        }
+    }
+    return accept;
+}
+async function output(cmd, args, logMode) {
+    const { stdout } = await (0, logging_1.execCommand)(cmd, args, { logMode, silent: true });
+    return stdout.split("\n").map((line) => line.trim());
+}
+async function defaultService(logMode) {
+    const route = await output("route", ["-n", "get", "default"], logMode);
+    const device = route
+        .map((line) => line.match(/^interface:\s*(\S+)$/)?.[1])
+        .find(Boolean);
+    const order = await output("networksetup", ["-listnetworkserviceorder"], logMode);
+    for (let i = 0; i < order.length - 1; i++) {
+        const name = order[i].match(/^\(\d+\) (.+)$/)?.[1];
+        const port = order[i + 1].match(/, Device: (\S*)\)$/)?.[1];
+        if (name && device && port === device) {
+            return name;
+        }
+    }
+}
+async function readDNS(service, logMode) {
+    const servers = await output("networksetup", ["-getdnsservers", service], logMode);
+    const domains = await output("networksetup", ["-getsearchdomains", service], logMode);
+    return {
+        service,
+        servers: servers.filter((line) => (0, net_1.isIP)(line) !== 0),
+        domains: domains.filter((line) => line !== "" && !/\s/.test(line)),
+    };
+}
+async function writeDNS(dns, logMode) {
+    const orEmpty = (values) => (values.length ? values : ["Empty"]);
+    await (0, logging_1.execCommand)("networksetup", ["-setdnsservers", dns.service, ...orEmpty(dns.servers)], { logMode, label: "set dns servers" });
+    await (0, logging_1.execCommand)("networksetup", ["-setsearchdomains", dns.service, ...orEmpty(dns.domains)], { logMode, label: "set search domains" });
+}
+async function configureDNSOnMacOS(tailnet, args, logMode) {
+    if (!tailnet.MagicDNSEnabled) {
+        (0, logging_1.logInfo)(logMode, "MagicDNS is disabled, not configuring DNS");
+        return;
+    }
+    if (!acceptsDNS(args)) {
+        (0, logging_1.logInfo)(logMode, "--accept-dns is false, not configuring DNS");
+        return;
+    }
+    let original;
+    try {
+        const service = await defaultService(logMode);
+        if (!service) {
+            core.warning("No network service found for the default route, not configuring DNS");
+            return;
+        }
+        original = await readDNS(service, logMode);
+    }
+    catch (e) {
+        core.warning(`Failed to read DNS settings, not configuring DNS: ${e}`);
+        return;
+    }
+    (0, logging_1.logInfo)(logMode, `Setting system DNS server on ${original.service} to 100.100.100.100 and searchdomains to ${tailnet.MagicDNSSuffix}`);
+    core.saveState(stateKey, JSON.stringify(original));
+    try {
+        await writeDNS({
+            service: original.service,
+            servers: ["100.100.100.100"],
+            domains: [tailnet.MagicDNSSuffix],
+        }, logMode);
+    }
+    catch (e) {
+        throw Error(`Failed to configure DNS on macOS: ${e}`);
+    }
+}
+async function restoreDNSOnMacOS(logMode) {
+    const saved = core.getState(stateKey);
+    if (!saved) {
+        return;
+    }
+    const original = JSON.parse(saved);
+    (0, logging_1.logInfo)(logMode, `Restoring DNS settings on ${original.service}`);
+    await writeDNS(original, logMode);
+}
+
+
+/***/ }),
+
 /***/ 41730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -52198,6 +52337,7 @@ const path = __importStar(__nccwpck_require__(16928));
 const semver = __importStar(__nccwpck_require__(62088));
 const promises_1 = __nccwpck_require__(16460);
 const logging_1 = __nccwpck_require__(91338);
+const macos_dns_1 = __nccwpck_require__(28320);
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
@@ -52259,7 +52399,7 @@ async function run() {
                 if (status.BackendState === "Running") {
                     (0, logging_1.logInfo)(config.logMode, "✅ Tailscale is running and connected!");
                     if (runnerOS === runnerMacOS) {
-                        await configureDNSOnMacOS(status, config.logMode);
+                        await (0, macos_dns_1.configureDNSOnMacOS)(status.CurrentTailnet, config.args, config.logMode);
                     }
                     shouldPingHosts = true;
                 }
@@ -52888,20 +53028,6 @@ async function installCachedBinaries(config, toolPath, runnerOS) {
         else {
             throw new Error(`Cached binaries not found in ${toolPath}`);
         }
-    }
-}
-async function configureDNSOnMacOS(status, logMode) {
-    if (!status.CurrentTailnet.MagicDNSEnabled) {
-        (0, logging_1.logInfo)(logMode, "MagicDNS is disabled, not configuring DNS");
-        return;
-    }
-    (0, logging_1.logInfo)(logMode, `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`);
-    try {
-        await execSilent("set dns servers", "networksetup", ["-setdnsservers", "Ethernet", "100.100.100.100"], { logMode });
-        await execSilent("set search domains", "networksetup", ["-setsearchdomains", "Ethernet", status.CurrentTailnet.MagicDNSSuffix], { logMode });
-    }
-    catch (e) {
-        throw Error(`Failed to configure DNS on macOS: ${e}`);
     }
 }
 run();
