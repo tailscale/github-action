@@ -21,6 +21,8 @@ import {
   withLogGroup,
 } from "./logging";
 import type { LogMode } from "./logging";
+import { configureDNSOnMacOS } from "./macos-dns";
+import type { tailnetInfo } from "./macos-dns";
 
 const cmdTailscale = "tailscale";
 const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
@@ -63,11 +65,6 @@ interface TailscaleConfig {
   pingHosts: string[];
   logMode: LogMode;
 }
-
-type tailnetInfo = {
-  MagicDNSSuffix: string;
-  MagicDNSEnabled: boolean;
-};
 
 type tailscaleStatus = {
   BackendState: string;
@@ -154,7 +151,11 @@ async function run(): Promise<void> {
           if (status.BackendState === "Running") {
             logInfo(config.logMode, "✅ Tailscale is running and connected!");
             if (runnerOS === runnerMacOS) {
-              await configureDNSOnMacOS(status, config.logMode);
+              await configureDNSOnMacOS(
+                status.CurrentTailnet,
+                config.args,
+                config.logMode,
+              );
             }
             shouldPingHosts = true;
           } else {
@@ -1029,37 +1030,6 @@ async function installCachedBinaries(
     } else {
       throw new Error(`Cached binaries not found in ${toolPath}`);
     }
-  }
-}
-
-async function configureDNSOnMacOS(
-  status: tailscaleStatus,
-  logMode: LogMode,
-): Promise<void> {
-  if (!status.CurrentTailnet.MagicDNSEnabled) {
-    logInfo(logMode, "MagicDNS is disabled, not configuring DNS");
-    return;
-  }
-
-  logInfo(
-    logMode,
-    `Setting system DNS server to 100.100.100.100 and searchdomains to ${status.CurrentTailnet.MagicDNSSuffix}`,
-  );
-  try {
-    await execSilent(
-      "set dns servers",
-      "networksetup",
-      ["-setdnsservers", "Ethernet", "100.100.100.100"],
-      { logMode },
-    );
-    await execSilent(
-      "set search domains",
-      "networksetup",
-      ["-setsearchdomains", "Ethernet", status.CurrentTailnet.MagicDNSSuffix],
-      { logMode },
-    );
-  } catch (e) {
-    throw Error(`Failed to configure DNS on macOS: ${e}`);
   }
 }
 
