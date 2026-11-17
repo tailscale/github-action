@@ -52456,19 +52456,24 @@ async function installTailscale(config, runnerOS) {
     const cacheKey = generateCacheKey(config, runnerOS);
     const toolPath = getToolPath(config, runnerOS);
     // Try to restore from cache first
+    let cacheHit = false;
     if (config.useCache && cacheKey) {
-        const cacheHit = await cache.restoreCache([toolPath], cacheKey);
+        cacheHit = !!(await cache.restoreCache([toolPath], cacheKey));
         if (cacheHit) {
             (0, logging_1.logInfo)(config.logMode, `Found Tailscale ${config.resolvedVersion} in cache: ${toolPath}`);
-            // For Windows, install the cached MSI
-            if (runnerOS === runnerWindows) {
+            if (config.sha256Sum && runnerOS !== runnerMacOS) {
+                (0, logging_1.logInfo)(config.logMode, "Verifying cached download against sha256sum");
+            }
+            else if (runnerOS === runnerWindows) {
+                // For Windows, install the cached MSI
                 await installTailscaleWindows(config, toolPath, true);
+                return;
             }
             else {
                 // For Linux/macOS, copy binaries to /usr/local/bin
                 await installCachedBinaries(config, toolPath, runnerOS);
+                return;
             }
-            return;
         }
     }
     // Install fresh if not cached
@@ -52482,7 +52487,7 @@ async function installTailscale(config, runnerOS) {
         await installTailscaleMacOS(config, toolPath);
     }
     // Save to cache after installation
-    if (config.useCache && cacheKey) {
+    if (config.useCache && cacheKey && !cacheHit) {
         try {
             await cache.saveCache([toolPath], cacheKey);
             (0, logging_1.logInfo)(config.logMode, `Cached Tailscale ${config.resolvedVersion} at: ${toolPath}`);
@@ -52517,6 +52522,10 @@ async function installTailscaleLinux(config, toolPath) {
     const baseUrl = isStable
         ? "https://pkgs.tailscale.com/stable"
         : "https://pkgs.tailscale.com/unstable";
+    // read sha256Sum before the fetch below fills it in
+    const tarDest = config.sha256Sum
+        ? path.join(toolPath, "tailscale.tgz")
+        : path.join(xdgCacheDir(), "tailscale.tgz");
     // Get SHA256 if not provided
     if (!config.sha256Sum) {
         const shaUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz.sha256`;
@@ -52526,7 +52535,6 @@ async function installTailscaleLinux(config, toolPath) {
     // Download and extract
     const downloadUrl = `${baseUrl}/tailscale_${config.resolvedVersion}_${config.arch}.tgz`;
     const expectedSha = config.sha256Sum.trim().toLowerCase();
-    const tarDest = path.join(xdgCacheDir(), "tailscale.tgz");
     fs.mkdirSync(path.dirname(tarDest), { recursive: true });
     // Check if the tarball already exists with the correct checksum (for
     // persistent self-hosted runners). tc.downloadTool refuses to overwrite an
@@ -52865,7 +52873,9 @@ function generateCacheKey(config, runnerOS) {
     if (!config.useCache) {
         return undefined;
     }
-    return `action-setup-tailscale/${config.resolvedVersion}/${runnerOS}-${config.arch}`;
+    const key = `action-setup-tailscale/${config.resolvedVersion}/${runnerOS}-${config.arch}`;
+    const sha256Sum = config.sha256Sum.trim().toLowerCase();
+    return sha256Sum ? `${key}/${sha256Sum}` : key;
 }
 function getToolPath(config, runnerOS) {
     const cacheDirectory = process.env.RUNNER_TOOL_CACHE || "";
