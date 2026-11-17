@@ -52332,8 +52332,10 @@ async function pingHost(host, logMode) {
     throw new Error(`❌ Ping host ${host} did not respond`);
 }
 async function getInputs() {
-    let ping = core.getInput("ping");
-    let pingHosts = ping?.length > 0 ? ping.split(",") : [];
+    const pingHosts = core
+        .getInput("ping")
+        .split(/[\s,]+/)
+        .filter(Boolean);
     const logMode = (0, logging_1.getLogMode)();
     const authKey = core.getInput("authkey") || "";
     const oauthSecret = core.getInput("oauth-secret") || "";
@@ -52360,7 +52362,7 @@ async function getInputs() {
         tailscaledArgs: core.getInput("tailscaled-args") || "",
         stateDir: core.getInput("statedir") || "",
         timeout: core.getInput("timeout") || "60s", // Reduced from 2m to 60s
-        retry: parseInt(core.getInput("retry") || "5"),
+        retry: parseRetry(core.getInput("retry") || "5"),
         useCache: core.getBooleanInput("use-cache"),
         sha256Sum: core.getInput("sha256sum") || "",
         pingHosts: pingHosts,
@@ -52369,6 +52371,7 @@ async function getInputs() {
     if (config.oauthSecret && !config.tags) {
         throw new Error("the tags parameter is required when using an OAuth client");
     }
+    parseTimeout(config.timeout);
     return config;
 }
 function parseVersion(input) {
@@ -52380,6 +52383,13 @@ function parseVersion(input) {
         throw new Error(`Invalid version "${input}": use a version number such as 1.104.2, "latest", or "unstable".`);
     }
     return version;
+}
+function parseRetry(input) {
+    const retry = Number(input);
+    if (!/^\d+$/.test(input) || retry < 1 || !Number.isSafeInteger(retry)) {
+        throw new Error(`Invalid retry "${input}": use a whole number of 1 or more, such as 5.`);
+    }
+    return retry;
 }
 function validateAuth(config) {
     if (!config.authKey &&
@@ -52689,7 +52699,7 @@ async function startTailscaleDaemon(config) {
     }
     const args = [
         ...stateArgs,
-        ...config.tailscaledArgs.split(" ").filter(Boolean),
+        ...config.tailscaledArgs.split(/\s+/).filter(Boolean),
     ];
     (0, logging_1.logInfo)(config.logMode, "Starting tailscaled daemon...");
     // Start daemon in background
@@ -52794,7 +52804,7 @@ async function connectToTailscale(config, runnerOS) {
         `--hostname=${hostname}`,
         "--accept-routes",
         ...platformArgs,
-        ...config.args.split(" ").filter(Boolean),
+        ...config.args.split(/\s+/).filter(Boolean),
         ...authArgs,
     ];
     // Retry logic
@@ -52841,22 +52851,22 @@ async function connectToTailscale(config, runnerOS) {
         }
     }
 }
-function parseTimeout(timeout) {
-    const match = timeout.match(/^(\d+)([smh]?)$/);
-    if (!match)
-        return 120000; // default 2 minutes
-    const value = parseInt(match[1]);
-    const unit = match[2] || "s";
-    switch (unit) {
-        case "s":
-            return value * 1000;
-        case "m":
-            return value * 60 * 1000;
-        case "h":
-            return value * 60 * 60 * 1000;
-        default:
-            return value * 1000;
+const durationUnits = {
+    ms: 1,
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+};
+const maxTimeoutMs = 2 ** 31 - 1; // setTimeout fires at once above this
+function parseTimeout(input) {
+    const timeout = /^\d*\.?\d+$/.test(input) ? `${input}s` : input;
+    const parts = [...timeout.matchAll(/(\d*\.?\d+)(ms|s|m|h)/g)];
+    const ms = parts.reduce((sum, [, value, unit]) => sum + Number(value) * durationUnits[unit], 0);
+    const whole = parts.map(([part]) => part).join("") === timeout;
+    if (!whole || !(ms > 0) || ms > maxTimeoutMs) {
+        throw new Error(`Invalid timeout "${input}": use a duration above zero such as 90s, 2m or 1m30s, up to 596h.`);
     }
+    return ms;
 }
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
